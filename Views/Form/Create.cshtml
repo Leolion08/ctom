@@ -1,0 +1,223 @@
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model CTOM.ViewModels.Form.FormCreateVM
+@{
+    ViewData["Title"] = "Nhập dữ liệu Form";
+    var templateOptions = ViewData["TemplateOptions"] as List<SelectListItem> ?? new();
+    var showStep1 = Model.TemplateId == 0; // Hiển thị bước 1 nếu chưa chọn template
+    var showStep2 = !showStep1; // Hiển thị bước 2 nếu đã chọn template
+}
+
+<!-- Thêm CSS chuẩn hóa -->
+<link rel="stylesheet" href="~/css/form/form-create.css" />
+
+<!-- Step indicator -->
+<ul class="steps steps-counter my-4" style="--tblr-step-icon-size:1.75rem;">
+    <li class="step-item active" id="stepIndicator1">
+        <span>Bước 1<br><small class="text-muted">Chọn template</small></span>
+    </li>
+    <li class="step-item" id="stepIndicator2">
+        <span>Bước 2<br><small class="text-muted">Nhập dữ liệu</small></span>
+    </li>
+</ul>
+
+<!-- ======================================================================= -->
+<!-- STEP 1: CHỌN TEMPLATE                                                  -->
+<!-- ======================================================================= -->
+@* <form id="step1Form" action="/Form/Create/Step1" method="post" autocomplete="off" class="@(showStep1 ? "" : "d-none")"> *@
+<form id="step1Form" action="@Url.Action("CreateStep1", "Form")" method="post" autocomplete="off" class="@(showStep1 ? "" : "d-none")">
+    @Html.AntiForgeryToken()
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Thông tin cơ bản</h3>
+        </div>
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="row mb-3">
+                <label asp-for="TemplateId" class="col-sm-3 col-form-label required"></label>
+                <div class="col-sm-9">
+                    <select asp-for="TemplateId" id="templateSelect" class="form-select" required
+                            oninvalid="this.setCustomValidity('Vui lòng chọn template')"
+                            oninput="this.setCustomValidity('')">
+                        <option value="">-- Chọn Template --</option>
+                        @foreach (var opt in templateOptions)
+                        {
+                            <option value="@opt.Value">@opt.Text</option>
+                        }
+                    </select>
+                    <span asp-validation-for="TemplateId" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer text-end">
+            <button class="btn btn-primary" type="submit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-right"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5 12l14 0" /><path d="M13 18l6 -6" /><path d="M13 6l6 6" /></svg>
+                Chuyển sang bước 2
+            </button>
+            <a asp-action="Index" class="btn btn-secondary ms-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M18 6l-12 12"></path><path d="M6 6l12 12"></path></svg>
+                Hủy bỏ
+            </a>
+        </div>
+    </div>
+</form>
+
+<!-- ======================================================================= -->
+<!-- STEP 2: NHẬP LIỆU & PREVIEW                                             -->
+<!-- ======================================================================= -->
+<div id="step2Section" class="@(showStep2 ? "" : "d-none") mt-4">
+    <div class="main-layout two-column">
+        <!-- CỘT TRÁI: FORM NHẬP LIỆU -->
+        <div class="form-input-area">
+            <form id="step2Form" asp-action="Create" method="post" class="card h-100 d-flex flex-column">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="TemplateId" />
+
+                <div class="card-header py-2">
+                    <h3 class="card-title mb-0">Nhập dữ liệu</h3>
+                </div>
+                <div class="card-body overflow-auto">
+                    <!-- THÔNG TIN CHUNG -->
+                    <fieldset class="form-fieldset">
+                        @* <legend>Thông tin chung</legend> *@
+                        <div class="row mb-3">
+                            <label class="col-sm-4 col-form-label">Tên template</label>
+                            <div class="col-sm-8">
+                                <input type="text" id="templateNameDisplay" class="form-control bg-light" readonly />
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label for="Note" class="col-sm-4 col-form-label">Ghi chú</label>
+                            <div class="col-sm-8">
+                                <textarea name="Note" id="Note" class="form-control" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- THÔNG TIN CHI TIẾT (ĐỘNG) -->
+                    <fieldset class="form-fieldset mt-3">
+                         @* <legend>Thông tin chi tiết</legend> *@
+                         <div id="dynamicFieldsContainer">
+                            <!-- Các control động sẽ được chèn vào đây bằng JS -->
+                         </div>
+                    </fieldset>
+                </div>
+                <div class="card-footer text-end bg-white mt-auto">
+                    <a asp-action="Index" class="btn btn-secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            <path d="M9 11l-4 4l4 4m-4 -4h11a4 4 0 0 0 0 -8h-1"></path>
+                        </svg>
+                        Quay lại danh sách
+                    </a>
+                    <button class="btn btn-secondary me-2" type="button" id="btnBack">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-left">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M5 12l14 0" />
+                            <path d="M5 12l6 6" />
+                            <path d="M5 12l6 -6" />
+                        </svg>
+                        Quay lại bước 1
+                    </button>
+                    <button id="btnSave" class="btn btn-primary" type="submit">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-device-floppy">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" />
+                            <path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                            <path d="M14 4l0 4l-6 0l0 -4" />
+                        </svg>
+                        <span class="btn-save-text">Lưu</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        <!-- CỘT PHẢI: HTML PREVIEW -->
+        <div class="preview-area">
+            <div class="card h-100 d-flex flex-column">
+                <div class="card-header py-2">
+                    <h3 class="card-title mb-0">Xem trước thay đổi</h3>
+                </div>
+                <div class="card-body" id="preview-pane-body">
+                    <div class="document-preview" id="htmlPreviewContainer">
+                        <div class="document-page" id="html-preview">
+                            @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
+                            {
+                                @Html.Raw(Model.HtmlContent)
+                            }
+                            else
+                            {
+                                <div class="text-center p-5 text-muted">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-text"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" /></svg>
+                                    <p class="mt-2">Chưa có nội dung xem trước</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODAL XÁC NHẬN TÙY CHỈNH                                               -->
+<!-- ======================================================================= -->
+
+<div class="modal fade" id="customModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div id="modalStatus" class="modal-status bg-primary"></div>
+            <div class="modal-body text-center py-4">
+                <i id="modalIcon" class="ti ti-info-circle" style="font-size: 3rem;"></i>
+                <h4 id="modalTitle" class="mt-2">Thông báo</h4>
+                <div id="modalMessage" class="text-muted"></div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button id="modalCancelBtn" type="button" class="btn w-100" data-bs-dismiss="modal">
+                                <!-- Icon sẽ được thêm bằng JS -->
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button id="modalConfirmBtn" type="button" class="btn btn-primary w-100">
+                                <!-- Icon sẽ được thêm bằng JS -->
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODAL XEM TRƯỚC & IN                                                   -->
+<!-- ======================================================================= -->
+<div class="modal modal-blur fade" id="mergePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Xem trước tài liệu đã trộn dữ liệu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="mergePreviewBody">
+                <div class="text-center p-5"><div class="spinner-border"></div><p class="mt-2">Đang xử lý...</p></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn me-auto" data-bs-dismiss="modal"><i class="ti ti-x me-2"></i>Đóng</button>
+                <button type="button" class="btn btn-success" id="modalDownloadBtn" disabled><i class="ti ti-download me-2"></i>Tải về file .docx</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/pizzip/dist/pizzip.min.js"></script>
+    <script src="~/lib/docxtemplater/build/docxtemplater.js"></script>
+    <script src="~/lib/file-saver/dist/FileSaver.min.js"></script>
+    <!-- Custom scripts -->
+    <script src="~/js/form/form-common.js"></script>
+    <script src="~/js/form/form-create.js"></script>
+}

@@ -1,0 +1,1155 @@
+@model CTOM.ViewModels.Template.TemplateMappingViewModel
+@using System.Text.Json;
+@{
+    ViewData["Title"] = "Ánh xạ trường dữ liệu (Mapping)";
+}
+
+@* Phần Header của trang (giữ nguyên) *@
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    <i class="ti ti-vector-bezier-2 me-2"></i>Ánh xạ trường dữ liệu (Mapping)
+                </h2>
+                <div class="text-muted mt-1">
+                    Template: @Model.TemplateName
+                </div>
+                @* Thông báo hướng dẫn user *@
+                <div class="mapping-instruction">
+                    <i class="ti ti-info-circle me-1"></i>
+                    <strong>Hướng dẫn:</strong> Click chọn vị trí trong tài liệu, sau đó bấm nút<button type="button" class="btn btn-sm btn-outline-primary ms-1" title="Chèn"><i class="ti ti-arrow-right"></i></button> để chèn thêm placeholder.<br>
+                    <ul class="mb-0 mt-1">
+                        <li>Không thể chỉnh sửa nội dung tài liệu gốc để đảm bảo ánh xạ chính xác.</li>
+                        @if (ViewData["MaxTableNestingLevel"] != null)
+                        {
+                            <li>Bảng lồng ghép tối đa @ViewData["MaxTableNestingLevel"] cấp.</li>
+                        }
+                    </ul>
+                </div>
+
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <a href="@Url.Action("Index")" class="btn btn-outline-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                        <path d="M9 11l-4 4l4 4m-4 -4h11a4 4 0 0 0 0 -8h-1"></path>
+                    </svg>
+                    Quay lại
+                </a>
+                <button type="button" class="btn btn-primary" id="saveMappingBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-device-floppy"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>
+                    Lưu thay đổi
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* Phần thân trang với layout 3 cột (giữ nguyên) *@
+<div class="page-body">
+    <div class="main-layout">
+        <!-- Cột trái: Danh sách các trường dữ liệu có sẵn -->
+        @* File: Mapping.cshtml - THAY THẾ TOÀN BỘ CỘT BÊN TRÁI *@
+
+        <div class="sidebar card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs nav-fill" role="tablist" id="fieldsTabNav">
+                    <li class="nav-item" role="presentation">
+                        <a href="#cif" class="nav-link active" role="tab">Trường CIF</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a href="#custom" class="nav-link" role="tab">Trường tùy biến</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-0 d-flex flex-column">
+
+                <div class="p-3 border-bottom">
+                    <div id="cif-search-group">
+                        <input type="text" class="form-control" placeholder="Tìm kiếm trường CIF..." id="searchField">
+                    </div>
+                    <div id="custom-search-group" class="d-none">
+                        <div class="input-group">
+                            <input type="text" class="form-control" placeholder="Tìm kiếm trường..." id="searchCustomField">
+                            <button type="button" class="btn btn-sm btn-success ms-2 rounded" id="showCreateFieldModalBtn" title="Tạo trường mới">
+                                <i class="ti ti-plus"></i> Tạo mới
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field-list-wrapper" id="fieldsListContainer">
+                    @* Danh sách sẽ được render hoàn toàn bằng JavaScript *@
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Cột giữa: Xem trước tài liệu -->
+        <div class="content-panel card">
+            <div class="card-header py-2">
+                <div class="card-title mb-0">Nội dung tài liệu</div>
+            </div>
+            <div class="card-body p-0 d-flex flex-column">
+
+
+                @* THAY ĐỔI LỚN:
+                  - Bỏ docx-preview.
+                  - Render trực tiếp HTML có cấu trúc từ server.
+                  - Khôi phục contenteditable để cho phép click chọn vị trí.
+                  - Thêm JavaScript ngăn chặn mọi thao tác chỉnh sửa text để tránh lệch offset.
+                *@
+                <div id="document-preview" class="flex-grow-1 p-4" contenteditable="true">
+                    @if (!string.IsNullOrEmpty(Model.StructuredHtmlContent))
+                    {
+                        @Html.Raw(Model.StructuredHtmlContent)
+                    }
+                    else
+                    {
+                        <div class="empty-placeholder">
+                            <i class="ti ti-file-off"></i>
+                            <p>Không có nội dung tài liệu để hiển thị.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Cột phải: Các trường đã chèn (giữ nguyên) -->
+        <div class="sidebar card">
+            <div class="card-header py-2">
+                <div class="card-title mb-0">Trường đã chèn</div>
+            </div>
+            <div class="card-body p-0 d-flex flex-column">
+                <div class="p-2 border-bottom d-flex justify-content-between align-items-center">
+                    <div class="small text-muted">Tổng số: <span id="insertedFieldsCount">0</span></div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="clearAllFields">
+                        <i class="ti ti-trash"></i> Xóa hết
+                    </button>
+                </div>
+                <div class="flex-grow-1 overflow-auto" id="insertedFieldsList">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal tạo trường tùy biến -->
+<div class="modal fade" id="createFieldModal" tabindex="-1" aria-labelledby="createFieldModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createFieldModalLabel">Tạo trường dữ liệu tùy biến</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createCustomFieldForm">
+                    <div class="mb-3">
+                        <label for="modalFieldName" class="form-label required">Tên trường</label>
+                        <input type="text" id="modalFieldName" class="form-control" placeholder="VD: SoTienDeNghi (viết liền, không dấu)" required>
+                        <small class="form-hint">Không chứa khoảng trắng hoặc ký tự đặc biệt.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modalDisplayName" class="form-label required">Tên hiển thị (trên form)</label>
+                        <input type="text" id="modalDisplayName" class="form-control" placeholder="VD: Số tiền đề nghị" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modalDataType" class="form-label">Kiểu dữ liệu</label>
+                        <select id="modalDataType" class="form-select">
+                            <option value="TEXT">TEXT (Một dòng)</option>
+                            <option value="TEXTAREA">TEXTAREA (Nhiều dòng)</option>
+                            <option value="NUMBER">NUMBER (Số)</option>
+                            <option value="DATE">DATE (Ngày tháng)</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" id="saveCustomFieldBtn">Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal tùy chỉnh cho thông báo và xác nhận -->
+<div class="modal fade" id="customModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-primary"></div>
+            <div class="modal-body text-center py-4">
+                <i id="modalIcon" class="ti ti-info-circle" style="font-size: 3rem;"></i>
+                <h4 id="modalTitle" class="mt-2">Thông báo</h4>
+                <div id="modalMessage" class="text-muted"></div>
+            </div>
+            <div class="modal-footer d-flex">
+                 <button id="modalCancelBtn" type="button" class="btn w-100" data-bs-dismiss="modal">Hủy</button>
+                 <button id="modalConfirmBtn" type="button" class="btn btn-primary w-100">Đồng ý</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Styles {
+    <link href="~/css/template/mapping.css" rel="stylesheet" />
+    <style>
+        /* dynamic styles */
+         /* === KHU VỰC SỬA ĐỔI: TỰ ĐỘNG TÔ MÀU BẢNG LỒNG NHAU === */
+        @{
+            var maxNestingLevel = (int)(ViewData["MaxTableNestingLevel"] ?? 1);
+            var maxAllowedDepth = maxNestingLevel + 1;
+            // Mảng màu cho các cấp được phép (xanh lá, xanh dương, tím, ...)
+            var allowedBorderColors = new[] { "#28a745", "#0d6efd", "#6f42c1" };
+            var allowedBgColors = new[] { "#f8fff9", "#f4f8ff", "#f8f5ff" };
+            var allowedHoverBgColors = new[] { "#e8f5e8", "#e3f2fd", "#efebf9" };
+        }
+
+        /* Tự động tạo style cho các cấp bảng được phép mapping */
+        @for (var level = 0; level <= maxNestingLevel; level++)
+        {
+            // Bảng cha (depth=1) không cần style đặc biệt.
+            // Bảng lồng cấp 1 (depth=2), cấp 2 (depth=3), ...
+            var depth = level + 2;
+            // Nếu cấu hình nhiều hơn số màu đã định nghĩa, quay vòng màu
+            if (level >= allowedBorderColors.Length) { continue; }
+
+            var borderColor = allowedBorderColors[level];
+            var bgColor = allowedBgColors[level];
+            var hoverBgColor = allowedHoverBgColors[level];
+
+            <text>
+            /* Style cho bảng lồng cấp @(level + 1) (data-nested-depth="@depth") */
+            #document-preview .nested-table[data-nested-depth="@depth"] {
+                border: 2px solid @(borderColor) !important;
+                background-color: @(bgColor) !important;
+            }
+            #document-preview .nested-table[data-nested-depth="@depth"] td {
+                background-color: @(bgColor) !important;
+            }
+            #document-preview .nested-table[data-nested-depth="@depth"]:hover {
+                background-color: @(hoverBgColor) !important;
+            }
+            </text>
+        }
+
+        /* Tự động tạo style cho các cấp bảng KHÔNG được phép mapping (màu đỏ) */
+        @{
+            var disallowedSelectors = new List<string>();
+            // Tạo selector cho các cấp sâu hơn mức cho phép (ví dụ: kiểm tra đến cấp 10)
+            for (int i = maxAllowedDepth + 1; i <= 10; i++)
+            {
+                disallowedSelectors.Add($"#document-preview .nested-table[data-nested-depth=\"{i}\"]");
+            }
+        }
+
+        @if(disallowedSelectors.Any())
+        {
+            <text>
+            @(string.Join(",\n", disallowedSelectors)) {
+                border: 2px solid #dc3545 !important; /* Red */
+                background-color: #fff5f5 !important;
+            }
+
+            @(string.Join(" td,\n", disallowedSelectors)) td {
+                background-color: #fff5f5 !important;
+            }
+            </text>
+        }
+
+        /* Hover effect cho các element có thể mapping (giữ nguyên) */
+        #document-preview [data-mappable="true"]:hover {
+            background-color: #e3f2fd !important;
+            cursor: pointer;
+        }
+        /* --- KẾT THÚC PHẦN dynamic styles --- */
+    </style>
+}
+
+@section Scripts {
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const initialFieldsData = @Html.Raw(JsonSerializer.Serialize(Model.AvailableFields, new JsonSerializerOptions { WriteIndented = false, TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() }));
+        const availableFieldsMap = new Map();
+        initialFieldsData.forEach(f => availableFieldsMap.set(f.Name, f));
+
+        // Lấy cấu hình MaxTableNestingLevel từ backend
+        const maxTableNestingLevel = @ViewData["MaxTableNestingLevel"];
+
+        const App = {
+            state: {
+                insertedFields: new Set(),
+                customFields: [],
+                activeTab: 'cif',
+                customModal: new bootstrap.Modal(document.getElementById('customModal')),
+                createFieldModal: new bootstrap.Modal(document.getElementById('createFieldModal')),
+            },
+            //Dọn dẹp và định nghĩa lại đối tượng elements cho chính xác
+            elements: {
+                docPreview: document.getElementById('document-preview'),
+                insertedList: document.getElementById('insertedFieldsList'),
+                insertedCount: document.getElementById('insertedFieldsCount'),
+                saveBtn: document.getElementById('saveMappingBtn'),
+                fieldsListContainer: document.getElementById('fieldsListContainer'),
+                tabNav: document.querySelector('#fieldsTabNav'),
+
+                // Search groups
+                cifSearchGroup: document.getElementById('cif-search-group'),
+                customSearchGroup: document.getElementById('custom-search-group'),
+                searchField: document.getElementById('searchField'),
+                searchCustomField: document.getElementById('searchCustomField'),
+
+                // Create Custom Field Modal
+                createFieldModalEl: document.getElementById('createFieldModal'),
+                showCreateFieldModalBtn: document.getElementById('showCreateFieldModalBtn'),
+                saveCustomFieldBtn: document.getElementById('saveCustomFieldBtn'),
+                modalFieldName: document.getElementById('modalFieldName'),
+                modalDisplayName: document.getElementById('modalDisplayName'),
+                modalDataType: document.getElementById('modalDataType'),
+
+                // Confirmation/Alert Modal
+                modalEl: document.getElementById('customModal'), // Đảm bảo element này được định nghĩa
+                modal: {
+                    title: document.getElementById('modalTitle'),
+                    message: document.getElementById('modalMessage'),
+                    icon: document.getElementById('modalIcon'),
+                    confirmBtn: document.getElementById('modalConfirmBtn'),
+                    cancelBtn: document.getElementById('modalCancelBtn'),
+                    footer: document.querySelector('#customModal .modal-footer'),
+                }
+            },
+
+            _initSidebarScrollHandler() {
+                const sidebars = document.querySelectorAll('.sidebar');
+
+                sidebars.forEach(sidebar => {
+                    sidebar.addEventListener('wheel', function(e) {
+                        const scrollableArea = this.querySelector('.field-list-wrapper');
+
+                        // Nếu không có vùng cuộn hoặc vùng cuộn không có thanh cuộn, thì không làm gì cả
+                        if (!scrollableArea || scrollableArea.scrollHeight <= scrollableArea.clientHeight) {
+                            return;
+                        }
+
+                        // Ngăn trang chính cuộn
+                        e.preventDefault();
+
+                        // Điều khiển thanh cuộn của sidebar
+                        scrollableArea.scrollTop += e.deltaY;
+                    }, { passive: false }); // Cần passive: false để preventDefault() hoạt động
+                });
+            },
+
+            init() {
+                this.bindEvents();
+                this.renderActiveTabList();
+                this.scanForExistingPlaceholders();
+                this.updateInsertedFieldsUI();
+                this._initSidebarScrollHandler();
+                this._initDocumentPreviewProtection(); // Ngăn chặn chỉnh sửa text
+            },
+
+            // --- HÀM RENDER CHÍNH ---
+            renderActiveTabList() {
+                let fieldsToRender = [];
+                if (this.state.activeTab === 'cif') {
+                    fieldsToRender = initialFieldsData.filter(f => f.DataSourceType === 'CIF' || !f.DataSourceType);
+                } else {
+                    fieldsToRender = this.state.customFields;
+                }
+
+                let html = '';
+                fieldsToRender.forEach(field => {
+                    html += this._createFieldItemHtml(field);
+                });
+
+                this.elements.fieldsListContainer.innerHTML = html || '<div class="p-4 text-center text-muted">Không có trường nào.</div>';
+            },
+
+            bindEvents() {
+                // Bật lại event listener chung cho các nút bấm
+                document.body.addEventListener('click', this.handleGlobalClick.bind(this));
+
+                // Sự kiện cho modal tạo trường
+                this.elements.showCreateFieldModalBtn.addEventListener('click', () => {
+                    this.elements.createFieldModalEl.querySelector('form').reset();
+                    this.state.createFieldModal.show();
+                });
+                this.elements.saveCustomFieldBtn.addEventListener('click', this.handleSaveCustomField.bind(this));
+
+                // Sự kiện cho tìm kiếm
+                this.elements.searchField.addEventListener('input', (e) => this.handleSearch(e));
+                this.elements.searchCustomField.addEventListener('input', (e) => this.handleSearch(e));
+
+                // Sự kiện cho chuyển tab
+                this.elements.tabNav.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetLink = e.target.closest('a.nav-link');
+                    if (!targetLink || targetLink.classList.contains('active')) return;
+
+                    this.elements.tabNav.querySelectorAll('a.nav-link').forEach(a => a.classList.remove('active'));
+                    targetLink.classList.add('active');
+
+                    this.state.activeTab = targetLink.getAttribute('href').substring(1);
+                    this.renderActiveTabList();
+
+                    this.elements.cifSearchGroup.classList.toggle('d-none', this.state.activeTab !== 'cif');
+                    this.elements.customSearchGroup.classList.toggle('d-none', this.state.activeTab === 'cif');
+                });
+            },
+
+            // --- Tái sử dụng code tạo HTML cho một field item ---
+            _createFieldItemHtml(field) {
+                const dataTypeUpper = field.DataType?.toUpperCase() ?? "TEXT";
+                let iconClass = "ti ti-abc text-muted";
+                if (dataTypeUpper.includes("DATE")) { iconClass = "ti ti-calendar-event text-danger"; }
+                else if (dataTypeUpper.includes("NUMBER") || dataTypeUpper.includes("DECIMAL")) { iconClass = "ti ti-number-123 text-success"; }
+                else if (dataTypeUpper.includes("TEXTAREA")) { iconClass = "ti ti-forms text-info"; }
+
+                const dataSourceBadge = field.DataSourceType ? `<span class="badge bg-${field.DataSourceType === 'CIF' ? 'primary' : 'yellow'}-lt d-block mt-2">${field.DataSourceType}</span>` : '';
+
+                return `
+                    <div class="field-item p-2 border-bottom" data-field-name="${field.Name}">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="field-item-display">
+                                <div style="text-align:center; width: 40px;">
+                                    ${dataSourceBadge}
+                                    <i class="${iconClass} field-data-type-icon" title="${field.DataType}"></i>
+                                </div>
+                                <div class="field-item-info">
+                                    <div class="fw-bold field-item-name" title="${field.Name}">${field.Name}</div>
+                                    <div class="text-muted small" title="${field.DisplayName}">${field.DisplayName ?? field.Name}</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary insert-field-btn ms-2" title="Chèn">
+                                <i class="ti ti-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>`;
+            },
+
+            handleGlobalClick(e) {
+                const target = e.target.closest('button');
+                if (!target) return;
+
+                if (target.matches('.insert-field-btn')) {
+                    const fieldName = target.closest('.field-item').dataset.fieldName;
+                    this.insertFieldAtCursor(fieldName);
+                } else if (target.matches('.btn-remove-field')) { // Sự kiện cho nút 'X'
+                    const fieldName = target.dataset.field;
+                    this.showConfirmation(
+                        `Xác nhận xóa`,
+                        `Bạn có chắc muốn xóa tất cả các lần chèn của trường <strong>${fieldName}</strong> không?`,
+                        () => this.removeField(fieldName)
+                    );
+                } else if (target.matches('#clearAllFields')) { // Sự kiện cho nút 'Xóa hết'
+                    this.showConfirmation(
+                        'Xóa tất cả các trường?',
+                        'Hành động này sẽ xóa tất cả các trường đã chèn.<br>Bạn có chắc không?',
+                        () => this.removeField(null, true)
+                    );
+                } else if (target.matches('#saveMappingBtn')) {
+                    this.showConfirmation(
+                        'Xác nhận lưu',
+                        'Bạn có chắc chắn muốn lưu các thay đổi này không? <br>(Sau bước này, template sẽ <strong><span style="color: red;">không thể ánh xạ lại</span></strong>)',
+                        () => this.performSave(), 'warning'
+                    );
+                }
+            },
+
+            renderActiveTabList() {
+                let fieldsToRender = [];
+                if (this.state.activeTab === 'cif') {
+                    fieldsToRender = initialFieldsData.filter(f => f.DataSourceType === 'CIF' || !f.DataSourceType);
+                } else {
+                    fieldsToRender = this.state.customFields;
+                }
+                let html = '';
+                fieldsToRender.forEach(field => {
+                    html += this._createFieldItemHtml(field);
+                });
+                this.elements.fieldsListContainer.innerHTML = html || '<div class="p-4 text-center text-muted">Không có trường nào.</div>';
+            },
+
+            handleSaveCustomField() {
+                const name = this.elements.modalFieldName.value.trim();
+                const displayName = this.elements.modalDisplayName.value.trim();
+                const dataType = this.elements.modalDataType.value;
+
+                // --- Validation sử dụng modal ---
+                if (!name || !displayName) {
+                    this.showAlert('Lỗi thông tin', 'Tên trường và Tên hiển thị là bắt buộc.', 'danger');
+                    return;
+                }
+                if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+                    this.showAlert('Lỗi Tên trường', 'Tên trường chỉ được chứa chữ cái (không dấu), số và dấu gạch dưới (_), không chứa khoảng trắng.', 'danger');
+                    return;
+                }
+                if (availableFieldsMap.has(name)) {
+                    this.showAlert('Lỗi Tên trường', `Tên trường "${name}" đã tồn tại. Vui lòng chọn tên khác.`, 'warning');
+                    return;
+                }
+
+                // --- Tạo object field mới ---
+                const newField = {
+                    Name: name,
+                    DisplayName: displayName,
+                    DataType: dataType,
+                    DataSourceType: 'FORM',
+                    CalculationFormula: null,
+                    DisplayOrder: 999
+                };
+
+                // --- Cập nhật state và UI ---
+                this.state.customFields.push(newField);
+                availableFieldsMap.set(newField.Name, newField);
+
+                // Đóng modal tạo trường và vẽ lại danh sách
+                this.state.createFieldModal.hide();
+                this.renderActiveTabList();
+
+                // --- Hiển thị thông báo thành công bằng modal ---
+                //this.showAlert('Thành công', `Đã tạo thành công trường "${displayName}"!`, 'success');
+            },
+
+            handleSearch(e) {
+                const searchText = e.target.value.toLowerCase();
+                const allFields = this.elements.fieldsListContainer.querySelectorAll('.field-item');
+                allFields.forEach(item => {
+                    const fieldName = (item.dataset.fieldName || '').toLowerCase();
+                    const displayName = (item.querySelector('.text-muted.small')?.textContent || '').toLowerCase();
+                    item.style.display = (fieldName.includes(searchText) || displayName.includes(searchText)) ? '' : 'none';
+                });
+            },
+
+            insertFieldAtCursor(fieldName) {
+                // Bước 1: Kiểm tra selection cơ bản
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) {
+                    this.showAlert('Cần chọn vị trí', 'Vui lòng chọn vị trí trong tài liệu trước khi chèn placeholder.', 'warning');
+                    return;
+                }
+
+                const range = selection.getRangeAt(0);
+
+                // Bước 2: Kiểm tra vị trí chèn có nằm trong document-preview không
+                const insertionContainer = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+                    ? range.commonAncestorContainer.parentElement
+                    : range.commonAncestorContainer;
+
+                if (!this.elements.docPreview.contains(insertionContainer)) {
+                    //this.showAlert('Vị trí không hợp lệ', 'Vui lòng chọn vị trí bên trong nội dung tài liệu.', 'warning');
+                    this.showAlert('Cần chọn vị trí', 'Vui lòng chọn vị trí trong tài liệu trước khi chèn placeholder.', 'warning');
+                    // Tự động focus vào document preview để hướng dẫn user
+                    this.elements.docPreview.focus();
+                    return;
+                }
+
+                // Bước 3: Kiểm tra element không thể mapping (chỉ kiểm tra data-mappable="false")
+                const nonMappableElement = insertionContainer.closest('[data-mappable="false"]');
+
+                if (nonMappableElement) {
+                    // Kiểm tra cấp độ lồng theo MaxTableNestingLevel
+                    const nestedDepth = parseInt(nonMappableElement.getAttribute('data-nested-depth')) || 0;
+                    const maxAllowedDepth = maxTableNestingLevel + 1; // +1 vì NestedDepth bắt đầu từ 1
+
+                    if (nestedDepth > maxAllowedDepth) {
+                        const nestingLevelText = maxTableNestingLevel === 0 ? 'bảng cha' :
+                                                maxTableNestingLevel === 1 ? 'bảng cha và bảng con lồng ghép 1 cấp' :
+                                                `bảng lồng ghép tối đa ${maxTableNestingLevel} cấp`;
+                        this.showAlert('Bảng lồng ghép quá nhiều cấp', `Chỉ có thể chèn placeholder vào ${nestingLevelText}. Bảng này lồng ghép quá nhiều cấp.`, 'warning');
+                    } else {
+                        this.showAlert('Vị trí không thể ánh xạ', 'Vui lòng chọn vị trí trong vùng có thể chèn placeholder.', 'warning');
+                    }
+                    return;
+                }
+
+                // Bước 4: Kiểm tra có phải là element mappable không
+                const mappableElement = insertionContainer.closest('[data-mappable="true"]');
+                if (!mappableElement) {
+                    this.showAlert('Vị trí không thể ánh xạ', 'Vui lòng chọn vị trí trong vùng có thể chèn placeholder (vùng sáng màu khi di chuột qua).', 'warning');
+                    return;
+                }
+
+                // Bước 5: Validation cuối cùng và chèn placeholder
+                let placeholderEl; // Khai báo biến ở phạm vi rộng hơn
+
+                try {
+                    // Kiểm tra lần cuối range có hợp lệ không
+                    if (!range || range.collapsed === undefined) {
+                        throw new Error('Range không hợp lệ');
+                    }
+
+                    // Kiểm tra container cuối cùng
+                    const finalContainer = range.startContainer.nodeType === Node.TEXT_NODE
+                        ? range.startContainer.parentElement
+                        : range.startContainer;
+
+                    if (!this.elements.docPreview.contains(finalContainer)) {
+                        throw new Error('Vị trí chèn không nằm trong tài liệu');
+                    }
+
+                    // Tạo và chèn placeholder vào DOM
+                    range.deleteContents(); // Xóa nội dung đang được chọn (nếu có)
+
+                    placeholderEl = document.createElement('span');
+                    placeholderEl.className = 'field-placeholder';
+                    placeholderEl.setAttribute('contenteditable', 'false'); // Rất quan trọng: không cho phép sửa nội dung placeholder
+                    placeholderEl.dataset.fieldName = fieldName;
+                    placeholderEl.textContent = `<<${fieldName}>>`;
+                    placeholderEl.style.cssText = 'font-family: Times New Roman; min-height: 11pt; text-indent: -4px;';
+                    
+                    // Thêm tooltip với diễn giải tiếng Việt
+                    const fieldInfo = availableFieldsMap.get(fieldName);
+                    if (fieldInfo && fieldInfo.DisplayName) {
+                        placeholderEl.title = `${fieldInfo.DisplayName} (${fieldName})`;
+                        placeholderEl.setAttribute('data-bs-toggle', 'tooltip');
+                        placeholderEl.setAttribute('data-bs-placement', 'top');
+                        placeholderEl.setAttribute('data-bs-html', 'true');
+                        placeholderEl.setAttribute('data-bs-title', `<strong>${fieldInfo.DisplayName}</strong><br><small class="text-muted">${fieldName}</small>`);
+                    } else {
+                        placeholderEl.title = fieldName;
+                    }
+
+                    range.insertNode(placeholderEl);
+
+                    // Kiểm tra sau khi chèn: placeholder có thực sự nằm trong document preview không
+                    if (!this.elements.docPreview.contains(placeholderEl)) {
+                        // Nếu không, xóa placeholder và báo lỗi
+                        placeholderEl.remove();
+                        throw new Error('Placeholder bị chèn ra ngoài vùng tài liệu');
+                    }
+
+                    console.log('✅ Placeholder chèn thành công:', fieldName, 'vào vị trí hợp lệ');
+
+                } catch (error) {
+                    console.error('❌ Lỗi khi chèn placeholder:', error.message);
+                    this.showAlert('Lỗi chèn placeholder', `Không thể chèn placeholder: ${error.message}. Vui lòng thử lại với vị trí khác.`, 'danger');
+                    return;
+                }
+
+                // Di chuyển con trỏ ra sau placeholder vừa chèn
+                range.setStartAfter(placeholderEl);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+
+                this.state.insertedFields.add(fieldName);
+                this.updateInsertedFieldsUI();
+                
+                // Khởi tạo tooltip cho placeholder vừa chèn
+                this.initializeTooltips();
+            },
+
+            showNestedTableWarning() {
+                // Hiển thị modal cảnh báo với giao diện cải thiện
+                const modal = $(`
+                    <div class="modal modal-blur fade" id="nestedTableWarningModal" tabindex="-1" role="dialog" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header bg-warning-lt">
+                                    <h5 class="modal-title text-warning">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-triangle me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="m0 0h24v24H0z" fill="none"/>
+                                            <path d="m12 9v2m0 4v.01"/>
+                                            <path d="m5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"/>
+                                        </svg>
+                                        Không thể chèn trường
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row align-items-center mb-3">
+                                        <div class="col-auto">
+                                            <span class="avatar bg-warning text-white">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path stroke="none" d="m0 0h24v24H0z" fill="none"/>
+                                                    <rect x="4" y="4" width="6" height="6" rx="1"/>
+                                                    <rect x="14" y="4" width="6" height="6" rx="1"/>
+                                                    <rect x="4" y="14" width="6" height="6" rx="1"/>
+                                                    <rect x="14" y="14" width="6" height="6" rx="1"/>
+                                                </svg>
+                                            </span>
+                                        </div>
+                                        <div class="col">
+                                            <h3 class="mb-1">Vị trí không hợp lệ</h3>
+                                            <div class="text-muted">Bạn đang cố gắng chèn trường vào <strong class="text-danger">bảng lồng nhau (bảng con)</strong></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="alert alert-warning" role="alert">
+                                        <div class="d-flex">
+                                            <div class="me-3">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path stroke="none" d="m0 0h24v24H0z" fill="none"/>
+                                                    <circle cx="12" cy="12" r="9"/>
+                                                    <line x1="12" y1="8" x2="12" y2="12"/>
+                                                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h4 class="alert-title">Quy tắc mapping</h4>
+                                                <div class="text-muted">
+                                                    Để đảm bảo tính chính xác, hệ thống chỉ cho phép chèn trường dữ liệu vào:
+                                                    <ul class="mt-2 mb-0">
+                                                        <li><strong>Bảng cha</strong> (bảng ngoài cùng)</li>
+                                                        <li><strong>Ngoài bảng</strong> (văn bản thường)</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="m0 0h24v24H0z" fill="none"/>
+                                            <path d="m5 12l5 5l10 -10"/>
+                                        </svg>
+                                        Đã hiểu
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+
+                // Thêm modal vào body và hiển thị
+                $('body').append(modal);
+                modal.modal('show');
+
+                // Xóa modal sau khi đóng
+                modal.on('hidden.bs.modal', function() {
+                    modal.remove();
+                });
+            },
+
+            calculateCharOffset(parentElement, targetElement) {
+                let charOffset = 0;
+                let currentNode = parentElement.firstChild;
+
+                while (currentNode && currentNode !== targetElement) {
+                    if (currentNode.nodeType === Node.TEXT_NODE) {
+                        charOffset += currentNode.textContent.length;
+                    } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                        if (currentNode.contains(targetElement)) {
+                            // Target nằm trong node này, đệ quy tính toán
+                            charOffset += this.calculateCharOffset(currentNode, targetElement);
+                            break;
+                        } else {
+                            charOffset += currentNode.textContent.length;
+                        }
+                    }
+                    currentNode = currentNode.nextSibling;
+                }
+
+                return charOffset;
+            },
+
+            removeField(fieldName, clearAll = false) {
+                if (clearAll) {
+                    this.elements.docPreview.querySelectorAll('.field-placeholder').forEach(el => el.remove());
+                    this.state.insertedFields.clear();
+                } else {
+                    this.elements.docPreview.querySelectorAll(`.field-placeholder[data-field-name="${fieldName}"]`).forEach(el => el.remove());
+                    this.state.insertedFields.delete(fieldName);
+                }
+                this.updateInsertedFieldsUI();
+            },
+
+            // --- BẮT ĐẦU KHU VỰC THAY ĐỔI ---
+
+            _getIconHtmlForDataType(dataType) {
+                const type = (dataType || 'TEXT').toUpperCase();
+                let iconClass = 'ti ti-abc text-muted'; // Default icon
+                if (type.includes('DATE')) {
+                    iconClass = 'ti ti-calendar-event text-danger';
+                } else if (type.includes('NUMBER') || type.includes('DECIMAL')) {
+                    iconClass = 'ti ti-number-123 text-success';
+                }
+                else if (type.includes("TEXTAREA")) { iconClass = "ti ti-forms text-info"; }
+                return `<i class="${iconClass} field-data-type-icon" title="${dataType || 'TEXT'}"></i>`;
+            },
+
+            updateInsertedFieldsUI() {
+                this.elements.insertedCount.textContent = this.state.insertedFields.size;
+                if (this.state.insertedFields.size === 0) {
+                    this.elements.insertedList.innerHTML = `<div class="empty-placeholder p-4"><i class="ti ti-info-circle"></i><span>Chưa có trường nào được chèn</span></div>`;
+                    return;
+                }
+
+                let html = '<div class="list-group list-group-flush field-list-wrapper">';
+                const sortedFields = Array.from(this.state.insertedFields).sort();
+
+                sortedFields.forEach(fieldName => {
+                    const count = this.elements.docPreview.querySelectorAll(`.field-placeholder[data-field-name="${fieldName}"]`).length;
+                    const fieldInfo = availableFieldsMap.get(fieldName);
+                    const displayName = fieldInfo?.DisplayName || fieldName;
+                    const dataType = fieldInfo?.DataType || 'TEXT';
+                    //const dataSourceType = fieldInfo?.DataSourceType || '';
+                    const iconHtml = this._getIconHtmlForDataType(dataType);
+                    const dataSourceType = fieldInfo?.DataSourceType || '';
+                    const badgeHtml = dataSourceType
+                    ? `<span class="badge ${dataSourceType === 'CIF' ? 'bg-primary-lt' : 'bg-yellow-lt'} d-block fs-6 mt-2">${dataSourceType}</span>`
+                    : '';
+
+                    html += `
+                        <div class="list-group-item p-2">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="field-item-display">
+                                    <div style="text-align:center;">
+                                        ${badgeHtml}
+                                        ${iconHtml}
+                                    </div>
+                                    <div class="field-item-info">
+                                        <div class="fw-bold field-item-name" title="${fieldName}">${fieldName}</div>
+                                        <div class="text-muted small" title="${displayName}">${displayName}</div>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center ms-2">
+                                    <span class="badge bg-secondary-lt me-2">SL: ${count}</span>
+                                    <button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-remove-field" data-field="${fieldName}" aria-label="Xóa trường ${fieldName}">
+                                        <i class="ti ti-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                html += '</div>';
+                this.elements.insertedList.innerHTML = html;
+            },
+
+            scanForExistingPlaceholders() {
+                const content = this.elements.docPreview.innerHTML;
+                const regex = /&lt;&lt;([a-zA-Z0-9_]+)&gt;&gt;/g;
+                let match;
+                while ((match = regex.exec(content)) !== null) {
+                    this.state.insertedFields.add(match[1]);
+                }
+
+                // Thay thế text thành các placeholder element với tooltip
+                const newHtml = content.replace(regex, (fullMatch, fieldName) => {
+                    const fieldInfo = availableFieldsMap.get(fieldName);
+                    let tooltipAttrs = '';
+                    if (fieldInfo && fieldInfo.DisplayName) {
+                        tooltipAttrs = `title="${fieldInfo.DisplayName} (${fieldName})" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" data-bs-title="<strong>${fieldInfo.DisplayName}</strong><br><small class='text-muted'>${fieldName}</small>"`;
+                    } else {
+                        tooltipAttrs = `title="${fieldName}"`;
+                    }
+                    return `<span class="field-placeholder" contenteditable="false" data-field-name="${fieldName}" ${tooltipAttrs}>${fullMatch.replace(/&lt;/g, '<').replace(/&gt;/g, '>')}</span>`;
+                });
+
+                if (this.state.insertedFields.size > 0) {
+                     this.elements.docPreview.innerHTML = newHtml;
+                     // Khởi tạo tooltip cho các placeholder có sẵn
+                     this.initializeTooltips();
+                }
+            },
+
+            // Khởi tạo tooltip Bootstrap cho các placeholder
+            initializeTooltips() {
+                // Hủy các tooltip cũ trước khi tạo mới
+                const existingTooltips = document.querySelectorAll('.field-placeholder[data-bs-toggle="tooltip"]');
+                existingTooltips.forEach(el => {
+                    const tooltipInstance = bootstrap.Tooltip.getInstance(el);
+                    if (tooltipInstance) {
+                        tooltipInstance.dispose();
+                    }
+                });
+
+                // Khởi tạo tooltip mới cho tất cả placeholder
+                const placeholders = document.querySelectorAll('.field-placeholder[data-bs-toggle="tooltip"]');
+                placeholders.forEach(el => {
+                    new bootstrap.Tooltip(el, {
+                        delay: { show: 300, hide: 100 },
+                        trigger: 'hover focus'
+                    });
+                });
+
+                console.log(`✅ Đã khởi tạo tooltip cho ${placeholders.length} placeholder`);
+            },
+
+            // Cập nhật hàm performSave để sử dụng element ID mới và validate bảng con
+            async performSave() {
+                // --- BƯỚC KIỂM TRA ĐỒNG BỘ ---
+                // 1. Lấy danh sách các placeholder thực tế có trong tài liệu
+                const placeholdersInDocument = this.elements.docPreview.querySelectorAll('.field-placeholder');
+                const fieldsInDocumentSet = new Set();
+                placeholdersInDocument.forEach(el => {
+                    fieldsInDocumentSet.add(el.dataset.fieldName);
+                });
+
+                // 2. Lấy danh sách các trường đang được quản lý ở cột phải
+                const fieldsInStateSet = this.state.insertedFields;
+
+                // 3. So sánh hai danh sách
+                let isSynced = fieldsInDocumentSet.size === fieldsInStateSet.size;
+                if (isSynced) {
+                    for (const fieldName of fieldsInStateSet) {
+                        if (!fieldsInDocumentSet.has(fieldName)) {
+                            isSynced = false;
+                            break;
+                        }
+                    }
+                }
+
+                // 4. Nếu không khớp, hiển thị cảnh báo và dừng lại
+                if (!isSynced) {
+                    this.showAlert(
+                        'Lỗi Dữ Liệu Không Khớp',
+                        'Danh sách "Trường đã chèn" không khớp với các trường thực tế trong tài liệu. Điều này có thể xảy ra do bạn đã xóa trường trong văn bản. <br><br>Vui lòng xóa các trường bị thừa ở cột bên phải và chèn lại nếu cần.',
+                        'danger'
+                    );
+                    return false; // Trả về false để báo cho hàm gọi biết là đã có lỗi
+                }
+
+                // ✨ KIỂM TRA MỚI: Validate theo MaxTableNestingLevel
+                const maxAllowedDepth = maxTableNestingLevel + 1; // +1 vì NestedDepth bắt đầu từ 1
+                const invalidPlaceholders = Array.from(placeholdersInDocument).filter(el => {
+                    const parentElement = el.closest('[data-nested-depth]');
+                    if (!parentElement) return false;
+
+                    const nestedDepth = parseInt(parentElement.dataset.nestedDepth) || 1;
+                    return nestedDepth > maxAllowedDepth;
+                });
+
+                if (invalidPlaceholders.length > 0) {
+                    const nestingLevelText = maxTableNestingLevel === 0 ? 'bảng cha' :
+                                            maxTableNestingLevel === 1 ? 'bảng cha và bảng con lồng 1 cấp' :
+                                            `bảng lồng tối đa ${maxTableNestingLevel} cấp`;
+
+                    this.showAlert(
+                        'Lỗi validation',
+                        `Phát hiện trường dữ liệu trong bảng lồng quá sâu. Hệ thống chỉ cho phép mapping vào ${nestingLevelText}. Vui lòng xóa các trường này trước khi lưu.`,
+                        'danger'
+                    );
+                    return false; // Ngăn không cho lưu
+                }
+                // --- KẾT THÚC BƯỚC KIỂM TRA ---
+
+                // Nếu đã khớp, tiếp tục quá trình lưu như bình thường
+                this.elements.saveBtn.disabled = true;
+                this.elements.saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang lưu...';
+
+                try {
+                    const fieldPositionMap = {};
+                    placeholdersInDocument.forEach((el) => {
+                        const fieldName = el.dataset.fieldName;
+
+                        // Tìm element cha gần nhất có data-element-id và mappable
+                        const parentElement = el.closest('[data-element-id][data-mappable="true"]');
+                        if (!fieldName || !parentElement) return;
+
+                        const elementId = parentElement.dataset.elementId;
+                        const docxPath = parentElement.dataset.docxPath;
+
+                        // Tính offset trong element
+                        let charOffset = this.calculateCharOffset(parentElement, el);
+
+                        const position = {
+                            elementId: elementId,
+                            docxPath: docxPath,
+                            charOffset: charOffset
+                        };
+
+                        if (!fieldPositionMap[fieldName]) fieldPositionMap[fieldName] = [];
+                        fieldPositionMap[fieldName].push(position);
+                    });
+
+                    const mappingData = {
+                        templateId: @Model.TemplateId,
+                        fields: Object.entries(fieldPositionMap).map(([fieldName, positions]) => {
+                            const fullFieldInfo = availableFieldsMap.get(fieldName);
+                            return {
+                                fieldName: fieldName,
+                                displayName: fullFieldInfo?.DisplayName || fieldName,
+                                dataType: fullFieldInfo?.DataType || "TEXT",
+                                isRequired: false,
+                                defaultValue: null,
+                                displayOrder: 0,
+                                description: fullFieldInfo?.Description || null,
+                                dataSourceType: fullFieldInfo?.DataSourceType || "CIF",
+                                calculationFormula: fullFieldInfo?.CalculationFormula || null,
+                                positions: positions
+                            };
+                        })
+                    };
+
+                    const response = await fetch('@Url.Action("SaveMapping", "Template")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                        },
+                        body: JSON.stringify(mappingData)
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        let errorMessage = `Lỗi từ server: ${response.statusText}`;
+                        try {
+                            const errorJson = JSON.parse(errorText);
+                            errorMessage = errorJson.message || errorMessage;
+                        } catch (e) { /* Bỏ qua lỗi parse */ }
+                        throw new Error(errorMessage);
+                    }
+
+                    const result = await response.json();
+                    // SỬA LỖI: Kiểm tra xem có redirectUrl không
+                    if (result && result.success && result.redirectUrl) {
+                        // Nếu thành công và server trả về redirect, client sẽ tự chuyển trang
+                        window.location.href = result.redirectUrl;
+                        return; // Dừng thực thi hàm tại đây
+                    } else if (result && result.success === false) {
+                        // Xử lý trường hợp success: false nhưng vẫn trả về 200 OK
+                        throw new Error(result.message || 'Lỗi không xác định từ server.');
+                    }
+
+                    // Trường hợp này ít xảy ra: success: true nhưng không có redirectUrl
+                    this.showAlert('Thành công', result.message || 'Lưu mapping thành công!', 'success');
+
+                } catch (error) {
+                    console.error('Lỗi khi lưu mapping:', error);
+                    this.showAlert('Lưu thất bại', `Đã có lỗi xảy ra: ${error.message}`, 'danger');
+                } finally {
+                    this.elements.saveBtn.disabled = false;
+                    this.elements.saveBtn.innerHTML = '<i class="ti ti-device-floppy me-1"></i> Lưu thay đổi';
+                }
+            },
+
+            showAlert(title = 'Thông báo', message, type = 'primary') {
+                this.elements.modal.title.textContent = title;
+                this.elements.modal.message.innerHTML = message;
+                this.elements.modal.icon.className = `ti ti-bell mb-2 text-${type}`;
+                this.elements.modal.footer.className = 'modal-footer d-flex justify-content-center';
+                this.elements.modal.cancelBtn.style.display = 'none';
+                this.elements.modal.confirmBtn.style.display = 'block';
+                this.elements.modal.confirmBtn.className = `btn btn-${type}`;
+                this.elements.modal.confirmBtn.textContent = 'Đóng';
+
+                const newConfirmBtn = this.elements.modal.confirmBtn.cloneNode(true);
+                this.elements.modal.confirmBtn.parentNode.replaceChild(newConfirmBtn, this.elements.modal.confirmBtn);
+                this.elements.modal.confirmBtn = newConfirmBtn;
+                this.elements.modal.confirmBtn.addEventListener('click', () => this.state.customModal.hide(), { once: true });
+
+                this.state.customModal.show();
+            },
+
+            // Kiểm tra kết quả trả về của hàm callback
+            showConfirmation(title, message, onConfirmCallback, type = 'danger') {
+                this.elements.modal.title.textContent = title;
+                this.elements.modal.message.innerHTML = message;
+                this.elements.modal.icon.className = `ti ti-alert-triangle mb-2 text-${type === 'danger' ? 'danger' : 'warning'}`;
+                this.elements.modal.footer.className = 'modal-footer d-flex justify-content-end';
+                this.elements.modal.cancelBtn.style.display = 'block';
+                this.elements.modal.confirmBtn.style.display = 'block';
+                this.elements.modal.cancelBtn.className = 'btn';
+                this.elements.modal.confirmBtn.className = `btn btn-${type}`;
+                this.elements.modal.confirmBtn.textContent = 'Đồng ý';
+
+                const newConfirmBtn = this.elements.modal.confirmBtn.cloneNode(true);
+                this.elements.modal.confirmBtn.parentNode.replaceChild(newConfirmBtn, this.elements.modal.confirmBtn);
+                this.elements.modal.confirmBtn = newConfirmBtn;
+
+                this.elements.modal.confirmBtn.addEventListener('click', async () => {
+                    let shouldHideModal = true;
+                    if (typeof onConfirmCallback === 'function') {
+                        // Gọi hàm callback (là hàm performSave)
+                        const result = await onConfirmCallback();
+                        // Nếu callback trả về false, nghĩa là nó đã tự xử lý modal, không cần đóng
+                        if (result === false) {
+                            shouldHideModal = false;
+                        }
+                    }
+
+                    // Chỉ đóng modal nếu callback không báo lỗi
+                    if (shouldHideModal) {
+                        this.state.customModal.hide();
+                    }
+                }, { once: true });
+
+                this.state.customModal.show();
+            },
+
+            /**
+             * Khởi tạo bảo vệ document preview - ngăn chặn chỉnh sửa text
+             * Cho phép click chọn vị trí nhưng ngăn mọi thao tác chỉnh sửa
+             */
+            _initDocumentPreviewProtection() {
+                const documentPreview = document.getElementById('document-preview');
+                if (!documentPreview) return;
+
+                // Ngăn chặn các phím tắt chỉnh sửa
+                documentPreview.addEventListener('keydown', (e) => {
+                    // Cho phép các phím điều hướng và selection
+                    const allowedKeys = [
+                        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                        'Home', 'End', 'PageUp', 'PageDown',
+                        'Tab', 'Escape', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
+                    ];
+
+                    // Cho phép Ctrl+A (select all), Ctrl+C (copy)
+                    if (e.ctrlKey && (e.key === 'a' || e.key === 'c' || e.key === 'A' || e.key === 'C')) {
+                        return; // Cho phép
+                    }
+
+                    // Ngăn chặn tất cả các phím khác (typing, paste, delete, etc.)
+                    if (!allowedKeys.includes(e.key)) {
+                        e.preventDefault();
+                        console.log('Chặn phím:', e.key, '- Không được phép chỉnh sửa text trong document preview');
+                    }
+                });
+
+                // Ngăn chặn paste
+                documentPreview.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    console.log('Chặn paste - Không được phép chỉnh sửa text trong document preview');
+                });
+
+                // Ngăn chặn drop (kéo thả file/text)
+                documentPreview.addEventListener('drop', (e) => {
+                    // Chỉ ngăn drop text/file, không ngăn drop placeholder từ sidebar
+                    if (e.dataTransfer.types.includes('text/plain') && !e.dataTransfer.getData('text/plain').startsWith('field:')) {
+                        e.preventDefault();
+                        console.log('Chặn drop text - Không được phép chỉnh sửa text trong document preview');
+                    }
+                });
+
+                // Ngăn chặn dragover cho text (nhưng vẫn cho phép placeholder)
+                documentPreview.addEventListener('dragover', (e) => {
+                    if (e.dataTransfer.types.includes('text/plain') && !e.dataTransfer.getData('text/plain').startsWith('field:')) {
+                        e.preventDefault();
+                    }
+                });
+
+                // Thêm visual feedback khi user cố gắng chỉnh sửa
+                let warningTimeout;
+                const showEditWarning = () => {
+                    documentPreview.style.backgroundColor = '#fff3cd';
+                    documentPreview.style.borderColor = '#ffeaa7';
+
+                    clearTimeout(warningTimeout);
+                    warningTimeout = setTimeout(() => {
+                        documentPreview.style.backgroundColor = '';
+                        documentPreview.style.borderColor = '';
+                    }, 1000);
+                };
+
+                // Hiển thị warning khi user cố typing
+                documentPreview.addEventListener('keydown', (e) => {
+                    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown', 'Tab', 'Escape'].includes(e.key) &&
+                        !(e.ctrlKey && (e.key === 'a' || e.key === 'c' || e.key === 'A' || e.key === 'C'))) {
+                        showEditWarning();
+                    }
+                });
+
+                console.log('✅ Document preview protection initialized - Text editing blocked, selection allowed');
+            },
+        };
+
+        App.init();
+    });
+    </script>
+}

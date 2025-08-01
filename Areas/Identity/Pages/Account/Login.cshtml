@@ -1,0 +1,79 @@
+﻿@page
+@model LoginModel
+
+@{
+    ViewData["Title"] = "Đăng nhập";
+}
+
+<div class="container container-tight py-4">
+    @* Container của Tabler cho trang hẹp *@
+    <div class="text-center mb-4">
+        @* Có thể thêm logo ở đây *@
+        @* <a href="." class="navbar-brand navbar-brand-autodark"><img src="./static/logo.svg" height="36" alt=""></a> *@
+        <h1>CTOM</h1>
+    </div>
+    <div class="card card-md">
+        <div class="card-body">
+            <h2 class="h2 text-center mb-4">@ViewData["Title"]</h2>
+            <form id="account" method="post">
+               @*  <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div> *@ @* Hiển thị lỗi tổng hợp *@
+                @* Kiểm tra xem có lỗi ở mức Model không (tương đương ModelOnly) *@
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState.TryGetValue(string.Empty, out var modelStateEntry) && modelStateEntry.Errors.Count > 0)
+                {
+                    <div class="alert alert-danger alert-important validation-summary-errors mb-3" role="alert" data-valmsg-summary="true">
+                        @* Thêm alert-important và mb-3 *@
+                        @* Có thể thêm tiêu đề nếu muốn: <h4 class="alert-title">Lỗi Đăng nhập</h4> *@
+                        <ul>
+                            @foreach (var error in modelStateEntry.Errors)
+                            {
+                                <li>@error.ErrorMessage</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @* Trường Tên đăng nhập (UserName) *@
+                <div class="mb-3">
+                    <label asp-for="Input.UserName" class="form-label"></label>
+                    <input asp-for="Input.UserName" class="form-control" autocomplete="username" aria-required="true" placeholder="Nhập tên đăng nhập" />
+                    <span asp-validation-for="Input.UserName" class="text-danger"></span>
+                </div>
+
+                @* Trường Mật khẩu *@
+                <div class="mb-2">
+                    <label asp-for="Input.Password" class="form-label">
+                        @Html.DisplayNameFor(m => m.Input.Password)
+                        @* Link quên mật khẩu (nếu có) *@
+                        @* <span class="form-label-description">
+                            <a asp-page="./ForgotPassword">Quên mật khẩu?</a>
+                        </span> *@
+                    </label>
+                    <input asp-for="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="Nhập mật khẩu" />
+                    <span asp-validation-for="Input.Password" class="text-danger"></span>
+                </div>
+
+                @* Checkbox Ghi nhớ đăng nhập *@
+                @* <div class="mb-2">
+                    <label asp-for="Input.RememberMe" class="form-check">
+                        <input asp-for="Input.RememberMe" class="form-check-input" />
+                        <span class="form-check-label">@Html.DisplayNameFor(m => m.Input.RememberMe)</span>
+                    </label>
+                </div> *@
+
+                @* Nút Đăng nhập *@
+                <div class="form-footer">
+                    <button id="login-submit" type="submit" class="btn btn-primary w-100">Đăng nhập</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @* Link Đăng ký (nếu có) *@
+    @* <div class="text-center text-muted mt-3">
+      Chưa có tài khoản? <a asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl" tabindex="-1">Đăng ký</a>
+    </div> *@
+</div>
+
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,634 @@
+@using CTOM.ViewModels.Template
+@using Microsoft.Extensions.Options
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@{
+    ViewData["Title"] = "Danh sách mẫu biểu (Templates)";
+    ViewData["ActivePage"] = "Quản lý mẫu biểu (Templates)";
+    var requestToken = Xsrf.GetAndStoreTokens(Context).RequestToken;
+}
+
+
+
+<!-- Container cho thông báo từ AJAX -->
+<div id="ajaxNotifications" class="position-fixed top-0 end-0 p-3" style="z-index: 1100;"></div>
+
+<!-- THAY ĐỔI 1: Áp dụng cấu trúc layout chuẩn từ IndexKHDN -->
+<div class="card">
+    <div class="card-header" style="background-color: var(--tblr-body-bg);">
+        <h3 class="card-title text-uppercase fw-bold">@ViewData["Title"]</h3>
+        <div class="card-actions">
+            <a asp-action="Create" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M12 5l0 14"></path>
+                    <path d="M5 12l14 0"></path>
+                </svg>
+                Tạo mới
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Thanh tìm kiếm tùy chỉnh -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <input type="text" id="templateSearchInput" class="form-control" placeholder="Tìm kiếm theo tên biểu mẫu hoặc người tạo...">
+                    <button id="templateSearchButton" class="btn btn-outline-secondary" type="button">
+                        <i class="ti ti-search me-1"></i>
+                        Tìm
+                    </button>
+                    <button id="clearTemplateSearchButton" class="btn btn-outline-secondary" type="button" title="Xóa tìm kiếm">
+                        <i class="ti ti-x"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bảng dữ liệu -->
+        <div class="table-responsive">
+            <!-- DataTable cần có class 'table-datatable' để xử lý tooltip -->
+            <table id="templates-table" class="table table-vcenter table-nowrap table-striped table-bordered table-datatable" style="width:100%;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-nowrap text-center">ID</th>
+                        <th class="text-nowrap">Nghiệp vụ</th>
+                        <th class="text-nowrap">Tên mẫu biểu <i class='ti ti-search ti-xs text-muted ms-1' title='Tìm kiếm theo tên mẫu biểu'></i></th>
+                        <th class="text-nowrap text-center">Khả dụng</th>
+                        <th class="text-nowrap">Người tạo <i class='ti ti-search ti-xs text-muted ms-1' title='Tìm kiếm theo người tạo'></i></th>
+                        <th class="text-nowrap">Ngày cập nhật</th>
+                        <th class="text-nowrap" style="display:none;">Trạng thái</th>
+                        <th class="text-nowrap text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dữ liệu sẽ được tải qua AJAX -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Sửa nhanh -->
+<div class="modal modal-blur fade" id="quickEditModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title d-flex align-items-center">
+                    <i class="ti ti-edit me-2"></i>
+                    <span>Chỉnh sửa thông tin cơ bản</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="quickEditForm" class="needs-validation" novalidate>
+                <div class="modal-body">
+
+                    <input type="hidden" id="editTemplateId" name="TemplateId" />
+
+                    <div class="row mb-3">
+                        <label for="editTemplateIdDisplay" class="col-sm-3 col-form-label required">Mã template</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="editTemplateIdDisplay" readonly disabled />
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label for="editBusinessOperation" class="col-sm-3 col-form-label required">Nghiệp vụ</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="editBusinessOperation" readonly disabled />
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label for="editTemplateName" class="col-sm-3 col-form-label required">Tên template</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="editTemplateName" name="TemplateName" required maxlength="255" data-maxlength-msg="Tên template không được vượt quá 255 ký tự" placeholder="Nhập tên template">
+                            <div class="d-flex justify-content-between mt-1">
+                                <div class="invalid-feedback">Vui lòng nhập tên template</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label for="editDescription" class="col-sm-3 col-form-label">Mô tả</label>
+                        <div class="col-sm-9">
+                            <textarea class="form-control" id="editDescription" name="Description" rows="3" maxlength="1000" data-maxlength-msg="Mô tả không được vượt quá 1000 ký tự" placeholder="Nhập mô tả (tùy chọn)"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label for="editIsActive" class="col-sm-3 col-form-label">Tình trạng</label>
+                        <div class="col-sm-9">
+                            <select id="editIsActive" name="IsActive" class="form-select">
+                                <option value="true">Đang sử dụng</option>
+                                <option value="false">Không sử dụng</option>
+                            </select>
+                            <div class="invalid-feedback">
+                                <i class="ti ti-alert-circle me-1"></i>Vui lòng chọn Tình trạng sử dụng
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal">
+                        <i class="ti ti-x me-1"></i>Hủy bỏ
+                    </button>
+                    <button type="submit" class="btn btn-primary ms-auto" id="btnSaveChanges">
+                        <i class="ti ti-device-floppy me-1"></i>
+                        <span class="btn-text">Lưu thay đổi</span>
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận xóa -->
+<div class="modal modal-blur fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                <i class="ti ti-alert-triangle text-danger" style="font-size: 3rem;"></i>
+                <h3>Xác nhận xóa</h3>
+                <div class="text-muted">
+                    Bạn có chắc chắn muốn xóa template <span id="modalItemName" class="fw-bold"></span> (ID: <span id="modalItemId"></span>)?
+                    <div class="mt-3">
+                        <small class="text-danger d-block">Hành động này không thể hoàn tác!</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">
+                                Hủy
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button type="button" id="confirmDeleteButton" class="btn btn-danger w-100">
+                                <i class="ti ti-trash me-1" style="font-size: 1rem;"></i>
+                                Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_CoreValidationScriptsPartial" />
+    <script src="~/js/datatable-helper.js" asp-append-version="true"></script>
+
+    <script>
+    // Biến toàn cục để lưu trữ DataTable
+    let templateDataTable;
+    const currentUser = '@(User.Identity.Name?.ToLowerInvariant() ?? "")';
+    //console.log('currentUser: ' + currentUser);
+
+    // --- URL Templates for dynamic path generation ---
+    const detailsUrlTemplate = '@Url.Action("Details", "Template", new { id = "__ID__" })';
+    const editUrlTemplate = '@Url.Action("Edit", "Template", new { id = "__ID__" })';
+    const deleteUrlTemplate = '@Url.Action("Delete", "Template")'; // For modal delete
+    const getTemplateUrlTemplate = '@Url.Action("GetTemplate", "Template", new { id = "__ID__" })';
+    const mappingUrlTemplate = '@Url.Action("Mapping", "Template", new { id = "__ID__" })';
+    const quickUpdateUrl = '@Url.Action("QuickUpdate", "Template")';
+
+    $(document).ready(function() {
+
+        // Khởi tạo DataTable
+        templateDataTable = $('#templates-table').DataTable({
+            processing: true, // Hiển thị thông báo "Processing..."
+            serverSide: true, // Kích hoạt server-side processing
+            searching: false,  // Tắt ô tìm kiếm mặc định của DataTables
+            orderMulti: false, // Chỉ cho phép sắp xếp theo một cột tại một thời điểm
+            order: [[5, "desc"]], // Mặc định sắp xếp theo ngày tạo mới nhất
+            // Định nghĩa các cột
+            // THAY ĐỔI 2: Cập nhật 'name' và 'data' trong các cột (đã chuẩn)
+            // Ý NGHĨA:
+            // - 'name' phải khớp với tên thuộc tính (camelCase) trong ViewModel trả về dưới dạng JSON.
+            columns: [
+                {
+                    name: "templateId", data: "templateId"
+                    , orderable: true, searchable: false, className: "text-nowrap text-center", width: "6%"
+                }, //0
+                {
+                    name: "businessOperationName", data: "businessOperationName",
+                    orderable: true,
+                    //searchable: true, 
+                    //className: "text-nowrap text-center"
+                    width: "15%",
+                    render: function(data) {
+                        return `<div class="text-truncate">${data || ''}</div>`;
+                    }
+                }, //1
+                {
+                    data: "templateName",
+                    name: "templateName",
+                    render: function(data, type, row) {
+                        const text = data || '';
+                        return `<div class="text-truncate">${text}</div>`;
+                    }
+                },//2
+                {
+                    name: "isActive", data: "isActive",
+                    orderable: true,
+                    searchable: false,
+                    className: "text-nowrap text-center",
+                    width: "10%",
+                    render: function (data, type) {
+                        if (type === 'display') {
+                            return data
+                                ? '<span title="Đang sử dụng">✅</span>'
+                                : '<span title="Không sử dụng">❌</span>';
+                        }
+                        return data;
+                    }
+                },//3
+                {
+                    name: "createdByUserName", data: "createdByUserName",
+                    orderable: true,
+                    searchable: true,
+                    className: "text-nowrap text-center",
+                    width: "12%"
+                },//4
+                {
+                    name: "lastModificationTimestamp", data: "lastModificationTimestamp",
+                    //"name": "CreationTimestamp","data": "creationTimestamp",
+                    orderable: true,
+                    searchable: false,
+                    className: "text-nowrap text-center",
+                    width: "13%",
+                    render: d => formatDateTime(d, 'dd/MM/yyyy HH:mm') //datatable-helper
+                },//5
+                {
+                    name: "status", data: "status",
+                    orderable: true,
+                    searchable: false,
+                    className: "text-nowrap text-center",
+                    visible: false
+                    //"width": "10%"
+                },//6
+                {
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: "text-nowrap",
+                    width: "240px",
+                    render: function(data, type, row) {
+                        const isOwner = row.createdByUserName?.toLowerCase() === currentUser;
+                        let buttons = `<a href="${detailsUrlTemplate.replace('__ID__', row.templateId)}" class="btn btn-sm btn-info" title="Xem chi tiết">
+                        <i class="ti ti-eye me-1"></i><span class="d-none d-sm-inline">Xem</span>
+                        </a>`;
+
+                        if (isOwner) {
+                            buttons += ` <button type="button" class="btn btn-sm btn-warning btn-quick-edit" title="Sửa nhanh" data-template-id="${row.templateId}"><i class="ti ti-edit me-1"></i><span class="d-none d-sm-inline">Sửa</span></button>`;
+
+                            if (row.status?.toLowerCase() === 'draft') {
+                                buttons += ` <button type="button" class="btn btn-sm btn-primary btn-mapping" title="Ánh xạ" data-template-id="${row.templateId}"><i class="ti ti-link me-1"></i><span class="d-none d-sm-inline">Ánh xạ</span></button>`;
+                                buttons += ` <button type="button" class="btn btn-sm btn-danger delete-confirmation-button" title="Xóa" data-id="${row.templateId}" data-name="${row.templateName}"><i class="ti ti-trash me-1"></i><span class="d-none d-sm-inline">Xóa</span></button>`;
+                            }
+                        }
+                        return `<div class="d-flex gap-1" role="group" aria-label="Thao tác">${buttons}</div>`;
+                    }
+                }
+            ],
+            ajax: {
+                url: "@Url.Action("GetDataTable", "Template")",
+                type: "POST",
+                data: function(d) {
+                    // Thêm Anti-Forgery Token
+                    d.__RequestVerificationToken = '@requestToken';
+
+                    // Thêm giá trị từ ô tìm kiếm tùy chỉnh
+                    const searchValue = $('#templateSearchInput').val();
+                    if (searchValue) {
+                        d.q = searchValue.trim();
+                    }
+                },
+                error: function(xhr, error, thrown) {
+                    console.error("Lỗi khi tải dữ liệu DataTables: ", error, thrown, xhr.responseText);
+                    var errorMessage = "Không thể tải dữ liệu. Vui lòng thử lại sau.";
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
+                    } else if (xhr.statusText && xhr.statusText !== "error") {
+                        errorMessage = `Lỗi server: ${xhr.status} ${xhr.statusText}`;
+                    }
+
+                    showAppNotification(errorMessage, 'danger', 'ajaxNotifications', 5000);
+
+                    if ($.fn.DataTable.isDataTable('#templates-table')) {
+                        $('#templates-table_processing').css('display', 'none');
+                    }
+                }
+            },
+            language: {
+                "processing": '<div class="spinner-border spinner-border-sm text-primary" role="status"></div> Đang xử lý...',
+                "lengthMenu": "Hiển thị _MENU_ mục",
+                "zeroRecords": "Không tìm thấy kết quả phù hợp",
+                "info": "Hiển thị từ _START_ đến _END_ của _TOTAL_ mục",
+                "infoEmpty": "Không có dữ liệu",
+                "infoFiltered": "(lọc từ _MAX_ mục)",
+                "paginate": { "first": "Đầu", "last": "Cuối", "next": "Tiếp", "previous": "Trước" },
+                "emptyTable": "Không có dữ liệu trong bảng"
+            },
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tất cả"]],
+            responsive: true,
+            autoWidth: false,
+            drawCallback: function(settings) {
+                // Gọi hàm helper, truyền vào API và chỉ số của các cột cần xử lý
+                initializeTruncateTooltips(this.api(), [1, 2]); // Cột 1 (Nghiệp vụ) và 2 (Tên mẫu biểu)
+            },
+            initComplete: function(settings, json) {
+                // Ẩn thông báo loading khi tải xong
+                $('#templates-table_processing').css('display', 'none');
+            }
+        });
+
+        // Xử lý sự kiện tìm kiếm
+        $('#templateSearchButton').on('click', function() {
+            templateDataTable.ajax.reload();
+        });
+
+        // Xử lý sự kiện nhấn Enter trong ô tìm kiếm
+        $('#templateSearchInput').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                templateDataTable.ajax.reload();
+            }
+        });
+
+        // Xử lý sự kiện xóa tìm kiếm
+        $('#clearTemplateSearchButton').on('click', function() {
+            $('#templateSearchInput').val('');
+            templateDataTable.ajax.reload();
+        });
+
+        // XỬ LÝ XÓA BEGIN
+        // Gọi hàm khởi tạo modal xóa dùng chung (phiên bản reload datatable)
+        initializeDataTableDeleteModal({
+            modalId: '#deleteConfirmModal',
+            triggerButtonSelector: '.delete-confirmation-button', // Selector cho các nút kích hoạt modal
+            confirmButtonId: 'confirmDeleteButton',
+            nameElementSelector: '#modalItemName',
+            idElementSelector: '#modalItemId',
+            dataIdAttribute: 'data-id',
+            dataNameAttribute: 'data-name',
+            // xoa va reload lại datatable
+            deleteUrlTemplate: deleteUrlTemplate + '/{id}', // Điều chỉnh URL nếu cần
+            dataTableInstance: templateDataTable, // Truyền instance của DataTable để reload
+            antiForgeryToken: '@requestToken',
+            entityName: 'template'
+        });
+
+        // XỬ LÝ XÓA // END
+    });
+
+
+    // Xử lý sự kiện mở modal sửa nhanh
+    $(document).on('click', '.btn-quick-edit', function() {
+        const btn = $(this);
+        const rowData = templateDataTable.row(btn.closest('tr')).data();
+        if (!rowData) {
+            //showAppNotification('Không lấy được dữ liệu template.', 'danger', 'ajaxNotifications', 5000);
+            showAppNotification('Không lấy được dữ liệu template.', 'danger', 'notificationPlaceholder', false); // false để tắt auto-hide
+            return;
+        }
+
+        const templateId = rowData.templateId;
+
+        // Gọi API lấy dữ liệu template chính xác từ DB
+        $.ajax({
+            //url: `/Template/GetTemplate/${templateId}`,
+            url: getTemplateUrlTemplate.replace('__ID__', templateId),
+            type: 'GET',
+            success: function (response) {
+                if (!response.success) {
+                    showAppNotification(response.message || 'Không lấy được dữ liệu template.', 'danger', 'notificationPlaceholder', false); // false để tắt auto-hide
+                    return;
+                }
+
+                const data = response.data;
+
+                // Chuẩn hóa key property (cả camelCase và PascalCase)
+                const templateIdResp = data.TemplateId ?? data.templateId;
+                const templateNameResp = data.TemplateName ?? data.templateName;
+                const businessOperationNameResp = data.BusinessOperationName ?? data.businessOperationName;
+                const descriptionResp = data.Description ?? data.description ?? '';
+                const isActiveResp = (data.IsActive ?? data.isActive) === true;
+
+                // Populate modal fields
+                $('#editTemplateId').val(templateIdResp);
+                $('#editTemplateIdDisplay').val(templateIdResp);
+                //$('#editBusinessOperation').val(rowData.businessOperationName); // lấy từ row vì không trả về BO
+                $('#editBusinessOperation').val(businessOperationNameResp);
+                $('#editTemplateName').val(templateNameResp);
+                $('#editDescription').val(descriptionResp);
+                $('#editIsActive').val(isActiveResp ? 'true' : 'false');
+
+                // Reset validation
+                const form = $('#quickEditForm');
+                form.removeClass('was-validated');
+                form.find('.is-invalid').removeClass('is-invalid');
+
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('quickEditModal'));
+                modal.show();
+            },
+            error: function () {
+                showAppNotification('Không lấy được dữ liệu template.', 'danger', 'notificationPlaceholder', false); // false để tắt auto-hide
+            }
+        });
+    });
+
+    // Xử lý click nút Mapping
+    $(document).on('click', '.btn-mapping', function () {
+        const templateId = $(this).data('template-id');
+        if (!templateId) {
+            showAppNotification('Không xác định được template.', 'danger', 'notificationPlaceholder', false);
+            return;
+        }
+
+        // Lấy token chống CSRF nếu có
+        const token = $('input[name="__RequestVerificationToken"]').val();
+
+        // Tạo form tạm và submit POST
+        const form = $('<form>', {
+            method: 'POST',
+            //action: `/Template/Mapping/${templateId}`
+            action: mappingUrlTemplate.replace('__ID__', templateId)
+        });
+
+        if (token) {
+            form.append($('<input>', {
+                type: 'hidden',
+                name: '__RequestVerificationToken',
+                value: token
+            }));
+        }
+
+        $('body').append(form);
+        form.submit();
+    });
+
+    // Hàm bật/tắt trạng thái loading cho nút lưu
+    function setLoadingState(isLoading) {
+        const btn = $('#btnSaveChanges');
+        const icon = btn.find('i');
+        const spinner = btn.find('.spinner-border');
+        const btnText = btn.find('.btn-text');
+
+        if (isLoading) {
+            btn.prop('disabled', true);
+            icon.addClass('d-none');
+            spinner.removeClass('d-none');
+            btnText.text('Đang lưu...');
+        } else {
+            btn.prop('disabled', false);
+            icon.removeClass('d-none');
+            spinner.addClass('d-none');
+            btnText.text('Lưu thay đổi');
+        }
+    }
+
+    // Xử lý submit form sửa nhanh
+    $('#quickEditForm').on('submit', function(e) {
+        e.preventDefault();
+        const form = $(this);
+        const formData = form.serializeArray();
+
+        // Reset validation trước
+        form.find('.is-invalid').removeClass('is-invalid');
+
+        // Kiểm tra độ dài tên template
+        const templateName = $('#editTemplateName').val().trim();
+        if (!templateName) {
+            $('#editTemplateName').addClass('is-invalid');
+            form.addClass('was-validated');
+            return false;
+        }
+
+        // Kiểm tra validation tổng thể
+        if (form[0].checkValidity() === false) {
+            form.addClass('was-validated');
+            return false;
+        }
+
+        // Nếu đã validate xong, tiến hành gửi form
+        setLoadingState(true);
+
+        // Tạo đối tượng dữ liệu để gửi đi
+        const requestData = {};
+        formData.forEach(item => {
+            // Xử lý riêng cho checkbox
+            if (item.name === 'IsActive') {
+                requestData[item.name] = item.value === 'true';
+            } else if (item.name === 'TemplateId') {
+                requestData[item.name] = parseInt(item.value);
+            } else if (item.name === 'Description' && !item.value.trim()) {
+                requestData[item.name] = null;
+            } else if (item.value) {
+                requestData[item.name] = item.value.trim();
+            }
+        });
+
+        // Nếu không có IsActive trong formData, set là false
+        if (formData.findIndex(item => item.name === 'IsActive') === -1) {
+            requestData['IsActive'] = false;
+        }
+
+        // Gửi yêu cầu cập nhật
+        $.ajax({
+            //url: '/Template/QuickUpdate',
+            url: quickUpdateUrl,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(requestData),
+            headers: {
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            },
+            success: function(response) {
+                setLoadingState(false);
+
+                if (response.success) {
+                    // Đóng modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('quickEditModal'));
+                    modal.hide();
+
+                    // Hiển thị thông báo thành công
+                    //showAppNotification(response.message || 'Cập nhật thông tin template thành công!', 'success', 'ajaxNotifications', 5000);
+                    showAppNotification(response.message || 'Cập nhật thông tin template thành công!', 'success', 'notificationPlaceholder', false); // false để tắt auto-hide
+                    // Cập nhật dữ liệu trong DataTable
+                    const rowApi = templateDataTable.row(`#template-${requestData.TemplateId}`);
+                    if (rowApi.any()) {
+                        const rowData = rowApi.data();
+                        if (rowData) {
+                            // Cập nhật các trường đã thay đổi
+                            rowData.templateName = requestData.TemplateName;
+                            rowData.description = requestData.Description;
+                            rowData.isActive = requestData.IsActive;
+                            //// Cập nhật hiển thị trạng thái
+                            //rowData.status = requestData.IsActive ? 'Active' : 'Inactive';
+                            // Cập nhật dữ liệu trong DataTable
+                            rowApi.data(rowData).draw(false);
+                        }
+                    } else {
+                        // Nếu không tìm thấy hàng, reload lại toàn bộ bảng
+                        templateDataTable.ajax.reload();
+                    }
+                } else {
+                    // Xử lý lỗi từ server
+                    let errorMessage = response.message || 'Có lỗi xảy ra khi cập nhật template.';
+
+                    // Hiển thị lỗi validation nếu có
+                    if (response.errors) {
+                        Object.entries(response.errors).forEach(([field, messages]) => {
+                            const errorMessage = Array.isArray(messages) ? messages.join(' ') : messages;
+                            $(`#edit${field}`).addClass('is-invalid').siblings('.invalid-feedback').text(errorMessage);
+                        });
+                        form.addClass('was-validated');
+                    } else {
+                        showAppNotification(errorMessage, 'danger', 'notificationPlaceholder', false); // false để tắt auto-hide
+                    }
+                }
+            },
+            error: function(xhr) {
+                setLoadingState(false);
+
+                let errorMessage = 'Có lỗi xảy ra khi gửi yêu cầu.';
+                try {
+                    const response = xhr.responseJSON;
+                    if (response && response.message) {
+                        errorMessage = response.message;
+
+                        // Xử lý lỗi validation từ server
+                        if (response.errors) {
+                            Object.entries(response.errors).forEach(([field, messages]) => {
+                                const errorMessage = Array.isArray(messages) ? messages.join(' ') : messages;
+                                $(`#edit${field}`).addClass('is-invalid').siblings('.invalid-feedback').text(errorMessage);
+                            });
+                            form.addClass('was-validated');
+                            return;
+                        }
+                    } else if (xhr.status === 400) {
+                        errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.';
+                    } else if (xhr.status === 404) {
+                        errorMessage = 'Không tìm thấy template cần cập nhật.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.';
+                    }
+                } catch (e) {
+                    console.error('Lỗi khi xử lý phản hồi lỗi:', e);
+                }
+
+                showAppNotification(errorMessage, 'danger', 'notificationPlaceholder', false); // false để tắt auto-hide
+            }
+        });
+    });
+
+</script>
+}

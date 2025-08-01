@@ -1,0 +1,235 @@
+/* ===== FORM EDIT STYLES ===== */
+/* CSS được sao chép từ create.css để đảm bảo tính đồng nhất. */
+/* Tổ chức theo thứ tự: từ thẻ cha đến thẻ con, từ layout chính đến chi tiết */
+
+/* ========================================
+   1. LAYOUT CHÍNH - Main Layout Structure
+   ======================================== */
+
+   .main-layout {
+    display: flex;
+    width: 100%;
+    gap: 1rem;
+    align-items: stretch;
+}
+
+.main-layout.two-column > div {
+    flex: 1;
+}
+
+/* ========================================
+   2. CARD COMPONENTS - Thành phần Card
+   ======================================== */
+
+.card {
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.card-body {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ========================================
+   3. DOCUMENT PREVIEW - Vùng hiển thị tài liệu
+   ======================================== */
+
+.document-preview {
+    overflow-y: auto;
+    padding: 1rem;
+    flex-grow: 1;
+    font-family: 'Times New Roman', Times, serif;
+    line-height: 1.15;
+    background: #fff;
+    color: #000;
+    border: none;
+    outline: none;
+    tab-size: 4;
+    -moz-tab-size: 4;
+}
+
+#html-preview, #html-preview * {
+    font-family: "Times New Roman", Times, serif !important;
+}
+
+/* ========================================
+   4. DOCUMENT PAGE - Trang tài liệu
+   ======================================== */
+
+.document-page {
+    background: #fff;
+    min-height: 100%;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 1.15;
+    color: #000;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.document-page::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* border: 1px solid #ddd; */
+    pointer-events: none;
+}
+
+/* ========================================
+   5. IMAGE HANDLING - Xử lý hình ảnh
+   ======================================== */
+
+.document-page img {
+    display: inline-block !important;
+    max-width: 100%;
+    height: auto;
+    vertical-align: top;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+img[src^="data:image"] {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+    margin: 2px !important;
+}
+
+.document-page td img[src^="data:image"] {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    object-fit: contain !important;
+    margin: 2px !important;
+    display: block !important;
+}
+
+.document-page td p:has(img[src^="data:image"]),
+.document-page p:has(img[src^="data:image"]) {
+    margin-right: 8pt !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+}
+
+.document-page td p img[src^="data:image"] {
+    width: auto !important;
+    height: auto !important;
+    min-width: 50px !important;
+    object-fit: contain !important;
+    margin: 2px !important;
+    display: inline-block !important;
+    vertical-align: top;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.document-page p img[src^="data:image"] {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+    margin: 2px !important;
+}
+
+/* ========================================
+   6. TABLE STYLING - Styling bảng
+   ======================================== */
+
+.document-page table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12pt;
+    font-size: inherit;
+}
+
+.document-page table,
+.document-page th,
+.document-page td {
+    border: 1px solid #000;
+}
+
+.document-page th,
+.document-page td {
+    padding: 4pt 6pt;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.15;
+}
+
+.document-page th {
+    background-color: transparent;
+    font-weight: bold;
+}
+
+.document-page table table {
+    margin-bottom: 0;
+}
+
+/* ========================================
+   7. TEXT CONTENT - Nội dung văn bản
+   ======================================== */
+
+.document-page p {
+    margin: 0 0 12pt 0;
+    text-align: justify;
+}
+
+/* ========================================
+   8. FORM SPECIFIC - Các style đặc thù cho form
+   ======================================== */
+
+.form-input-area,
+.preview-area {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* ========================================
+   9. RESPONSIVE DESIGN - Thiết kế responsive
+   ======================================== */
+
+@media (max-width: 1200px) {
+    .document-page {
+        max-width: 100%;
+        margin: 0;
+        padding: 48px 36px;
+    }
+}
+
+@media (max-width: 992px) {
+    .main-layout {
+        flex-direction: column;
+    }
+
+    .main-layout.two-column > div {
+        flex: none;
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .document-page {
+        padding: 24px 18px;
+        font-size: 11pt;
+    }
+}

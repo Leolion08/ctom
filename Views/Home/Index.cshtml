@@ -1,0 +1,299 @@
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<CTOM.Models.Entities.ApplicationUser> SignInManager
+
+@{
+    ViewData["Title"] = "Trang chủ";
+}
+
+<!-- Welcome Banner -->
+<div class="card card-body bg-blue-lt border-0 shadow-sm mb-4 text-center">
+    <h2 class="card-title h1">Chào mừng đến với CTOM</h2>
+    <p class="text-muted">Hệ thống tự động hóa, đẩy nhanh tác nghiệp của Cán bộ Hỗ trợ Tín dụng/Quản lý Khách hàng.</p>
+    @* @if (!SignInManager.IsSignedIn(User))
+    {
+        <div class="mt-3">
+             <a asp-area="Identity" asp-page="/Account/Login" class="btn btn-primary">
+                Đăng nhập
+            </a>
+        </div>
+    } *@
+</div>
+
+<div class="row g-4">
+    <!-- Left Column: Core Workflow -->
+    <div class="col-lg-5 d-flex flex-column">
+        <div class="card card-style-v2">
+            <div class="card-body">
+                <!-- Core Workflow -->
+                @* <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8"> *@
+                    <h3 class="text-xl font-semibold mb-4 flex items-center">
+                        <i data-lucide="workflow" class="mr-3 text-blue-600"></i>
+                        Quy trình làm việc cốt lõi
+                    </h3>
+                    <div class="relative">
+                        <!-- Step 1 -->
+                        <div class="timeline-step relative pb-8 pl-10">
+                            <div class="absolute top-0 left-0 flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full text-blue-600 font-bold">1</div>
+                            <h4 class="font-semibold text-lg">Chuẩn bị Thông tin Khách hàng (CIF)</h4>
+                            <p class="mt-1 text-gray-600">Xây dựng kho dữ liệu khách hàng bằng cách khai báo thủ công hoặc import từ Excel. Dữ liệu này sẽ được tái sử dụng, tự động điền vào các giao dịch sau này.</p>
+                        </div>
+                        <!-- Step 2 -->
+                        <div class="timeline-step relative pb-8 pl-10">
+                            <div class="absolute top-0 left-0 flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full text-blue-600 font-bold">2</div>
+                            <h4 class="font-semibold text-lg">Quản lý Mẫu biểu (Templates)</h4>
+                            <p class="mt-1 text-gray-600">Tải lên và quản lý các file mẫu (.docx) cho từng nghiệp vụ cụ thể. Đây là nền tảng cho việc tạo tài liệu tự động.</p>
+                        </div>
+                        <!-- Step 3 -->
+                        <div class="timeline-step relative pb-8 pl-10">
+                            <div class="absolute top-0 left-0 flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full text-blue-600 font-bold">3</div>
+                            <h4 class="font-semibold text-lg">Ánh xạ Trường dữ liệu (Mapping)</h4>
+                            <p class="mt-1 text-gray-600">Kết nối các trường dữ liệu từ kho CIF và các trường nhập liệu khác vào các vị trí tương ứng trên Mẫu biểu.</p>
+                        </div>
+                        <!-- Step 4 -->
+                        <div class="timeline-step relative pb-8 pl-10">
+                            <div class="absolute top-0 left-0 flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full text-blue-600 font-bold">4</div>
+                            <h4 class="font-semibold text-lg">Tạo Giao dịch & Nhập liệu</h4>
+                            <p class="mt-1 text-gray-600">Chọn một Mẫu biểu đã ánh xạ, chọn khách hàng (CIF) để tự động điền thông tin, và nhập các dữ liệu bổ sung vào form được tạo tự động.</p>
+                        </div>
+                        <!-- Step 5 -->
+                        <div class="timeline-step relative pl-10">
+                            <div class="absolute top-0 left-0 flex items-center justify-center w-8 h-8 bg-green-100 rounded-full text-green-600">
+                                <i data-lucide="check-circle-2" class="h-6 w-6"></i>
+                            </div>
+                            <h4 class="font-semibold text-lg">Xuất & Lưu trữ Tài liệu</h4>
+                            <p class="mt-1 text-gray-600">Hệ thống tự động tạo tài liệu hoàn chỉnh. Người dùng có thể xem lại, tải xuống và quản lý các giao dịch đã tạo.</p>
+                        </div>
+                    </div>
+                @* </div> *@
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Data Flow Diagram -->
+    <div class="col-lg-7 d-flex flex-column">
+        <div class="card card-style-v2">
+            <div class="card-body">
+                <h3 class="text-xl font-semibold mb-4 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-git-merge me-2 text-purple" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M7 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M7 8l0 8" /><path d="M9 12l6 0" /></svg>
+                    Sơ đồ luồng dữ liệu
+                </h3>
+
+                <!-- Phase 1 -->
+                <div class="mb-4 p-3 border rounded-3 bg-light">
+                    <h5 class="text-muted mb-3">Giai đoạn 1: Tạo Mẫu biểu ánh xạ</h5>
+                    <div class="d-flex flex-column align-items-center gap-2">
+                        <div class="row g-3 w-100 text-center">
+                            <div class="col">
+                                <div class="flow-box flow-box-input"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" /></svg> <span>Mẫu biểu gốc</span></div>
+                            </div>
+                            <div class="col">
+                                <div class="flow-box flow-box-input"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" /></svg> <span>Trường CIF</span></div>
+                            </div>
+                            <div class="col">
+                                <div class="flow-box flow-box-input"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg> <span>Trường tự định nghĩa</span></div>
+                            </div>
+                        </div>
+                        <div class="text-muted mt-1"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M18 13l-6 6" /><path d="M6 13l6 6" /></svg></div>
+                        <div class="flow-box flow-box-mapped w-100"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 15l6 -6" /><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-1.837 1.837a5 5 0 0 1 -7.071 0" /><path d="M13 18l-.397 .534a5 5 0 0 1 -7.071 -7.072l1.837 -1.837a5 5 0 0 1 7.071 0" /></svg> <span>Mẫu biểu đã ánh xạ (Mapped Template)</span></div>
+                        @* <div class="text-muted mt-1"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M18 13l-6 6" /><path d="M6 13l6 6" /></svg></div>
+                        <div class="flow-box flow-box-transaction w-100"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M12 11l0 6" /><path d="M9 14l6 0" /></svg> <span>Tạo Giao dịch nhập liệu</span></div> *@
+                    </div>
+                </div>
+
+                <!-- Phase 2 -->
+                 <div class="mt-4 p-3 border rounded-3 bg-light">
+                    <h5 class="text-muted mb-3">Giai đoạn 2: Trộn Dữ liệu</h5>
+                    <div class="d-flex flex-column align-items-center gap-2">
+                         <div class="row g-3 w-100 text-center">
+                            <div class="col">
+                                <div class="flow-box flow-box-transaction">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                                        <path d="M12 11l0 6" />
+                                        <path d="M9 14l6 0" />
+                                    </svg>
+                                    <span>Tạo giao dịch & nhập liệu</span>
+                                </div>
+                            </div>
+
+                            <div class="col">
+                                <div class="flow-box flow-box-mapped">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                        <path d="M9 15l6 -6" />
+                                        <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-1.837 1.837a5 5 0 0 1 -7.071 0" />
+                                        <path d="M13 18l-.397 .534a5 5 0 0 1 -7.071 -7.072l1.837 -1.837a5 5 0 0 1 7.071 0" />
+                                    </svg>
+                                    <span>Mẫu biểu đã ánh xạ</span>
+                                </div>
+                            </div>
+
+                        </div>
+                        <div class="text-muted mt-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M12 5l0 14" />
+                                <path d="M18 13l-6 6" />
+                                <path d="M6 13l6 6" />
+                            </svg>
+                        </div>
+                        <div class="flow-box flow-box-merge w-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrows-shuffle">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M18 4l3 3l-3 3" />
+                                <path d="M18 20l3 -3l-3 -3" />
+                                <path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5" />
+                                <path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3" />
+                            </svg>
+                            <span>Trộn dữ liệu (Merge Data)</span>
+                        </div>
+                        <div class="text-muted mt-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M12 5l0 14" />
+                                <path d="M18 13l-6 6" />
+                                <path d="M6 13l6 6" />
+                            </svg>
+                        </div>
+                        <div class="flow-box flow-box-final w-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-type-docx">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                                <path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" />
+                                <path d="M2 15v6h1a2 2 0 0 0 2 -2v-2a2 2 0 0 0 -2 -2h-1z" />
+                                <path d="M17 16.5a1.5 1.5 0 0 0 -3 0v3a1.5 1.5 0 0 0 3 0" />
+                                <path d="M9.5 15a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1 -3 0v-3a1.5 1.5 0 0 1 1.5 -1.5z" />
+                                <path d="M19.5 15l3 6" />
+                                <path d="M19.5 21l3 -6" />
+                            </svg>
+                            <span>Tài liệu hoàn chỉnh</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Styles {
+    <link rel="stylesheet" href="~/lib/tailwind/tailwind-3.4.17.min.css" />
+
+    @*
+    CSS tùy chỉnh cho phiên bản v2.2
+    - .card-style-v2: Style thẻ trắng, có viền và bóng đổ.
+    - .timeline-step: Giao diện dòng thời gian.
+    - .flow-box: Style cơ bản cho các khối trong sơ đồ.
+    - .flow-box-*: Các lớp màu sắc và viền riêng cho từng loại khối, đảm bảo hiển thị đúng như thiết kế.
+    *@
+<style>
+    @* body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+    } *@
+    .card-style-v2 {
+        background-color: #ffffff !important;
+        border: 1px solid #e9ecef !important;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, .075) !important;
+        height: 100%;
+    }
+
+    .timeline-step {
+        position: relative;
+        padding-left: 2.5rem;
+        padding-bottom: 2rem;
+    }
+
+    .timeline-step:before {
+        content: '';
+        position: absolute;
+        left: 15px;
+        top: 32px;
+        width: 2px;
+        height: calc(100% - 32px);
+        background-color: #e9ecef;
+    }
+
+    .timeline-step:last-child:before {
+        display: none;
+    }
+
+    .flow-box {
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: row; /* Thay đổi để icon và text nằm ngang */
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem; /* Khoảng cách giữa icon và text */
+        border-width: 1px;
+        font-weight: bold; /* 500 */
+    }
+
+    /* Input styles */
+    .flow-box-input {
+        background-color: #ffffff;
+        border-color: #bac8fd;
+        color: #206bc4;
+    }
+    .flow-box-input .icon { color: #206bc4; }
+
+    /* Mapped Template styles */
+    .flow-box-transaction {
+        background-color: #fffbeb;
+        border-color: #ffc966;
+        color: #f59f00;
+    }
+    .flow-box-transaction .icon { color: #f59f00; }
+
+    /* Transaction styles */
+    .flow-box-mapped {
+        background-color: #fdf4ff;
+        border-color: #d693e8;
+        color: #ae3ec9;
+    }
+    .flow-box-mapped .icon { color: #ae3ec9; }
+
+    /* Merge styles - UPDATED COLOR */
+    .flow-box-merge {
+        background-color: #f0f9ff; /* Light Cyan */
+        border-color: #74c0fc;    /* Cyan */
+        color: #0c8599;           /* Dark Cyan */
+    }
+    .flow-box-merge .icon { color: #0c8599; }
+
+    /* Final styles */
+    .flow-box-final {
+        background-color: #f3faf4;
+        border-color: #7dd48c;
+        color: #2fb344;
+    }
+    .flow-box-final .icon { color: #2fb344; }
+</style>
+}
+
+@section Scripts {
+     @* <script src="~/lib/tailwind/tailwind-3.4.16.min.js"></script> *@
+     <script src="~/lib/lucide/dist/umd/lucide.min.js"></script>
+     <script>
+        lucide.createIcons();
+
+        @* // Add smooth scrolling and interactive effects
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add hover effects to flow boxes
+            const flowBoxes = document.querySelectorAll('.flow-box');
+            flowBoxes.forEach(box => {
+                box.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-2px) scale(1.02)';
+                });
+                box.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+        }); *@
+     </script>
+}

@@ -1,0 +1,162 @@
+@model CTOM.ViewModels.Template.TemplateDetailsVM
+
+@{
+    ViewData["Title"] = "Chi tiết Template";
+    ViewData["ActivePage"] = "Quản lý Template";
+}
+
+<!-- Read-only Details page (refactored) -->
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    <i class="ti ti-eye me-2"></i>
+                    @ViewData["Title"]
+                </h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                        <path d="M9 11l-4 4l4 4m-4 -4h11a4 4 0 0 0 0 -8h-1"></path>
+                    </svg>
+                    Quay lại danh sách
+                </a>
+
+                <button type="button" id="btnMapping" class="btn btn-primary ms-2 btn-mapping" data-template-id="@Model.TemplateId" @(Model.CanMapping ? "" : "disabled")>
+                    <i class="ti ti-link me-1"></i>
+                    Ánh xạ
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="main-layout">
+        <!-- Left column: metadata -->
+        <div class="sidebar card">
+            <div class="card-header py-2">
+                <h3 class="card-title mb-0">Thông tin chung</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5 text-muted">Mã Template</dt>
+                    <dd class="col-7 fw-bold">@Model.TemplateCode</dd>
+
+                    <dt class="col-5 text-muted">Tên Template</dt>
+                    <dd class="col-7">@Model.TemplateName</dd>
+
+                    <dt class="col-5 text-muted">Nghiệp vụ</dt>
+                    <dd class="col-7">@(Model.BusinessOperationName ?? "-")</dd>
+
+                    <dt class="col-5 text-muted">Mô tả</dt>
+                    <dd class="col-7">@(Model.Description ?? "-")</dd>
+
+                    <dt class="col-5 text-muted">Trạng thái</dt>
+                    <dd class="col-7">
+                        <!-- UPDATED: Use -lt class for better contrast -->
+                        <span class="badge @(Model.Status == "Mapped" ? "bg-success-lt" : "bg-secondary-lt")">
+                            @Model.Status
+                        </span>
+                    </dd>
+
+                    <dt class="col-5 text-muted">Tình trạng sử dụng</dt>
+                    <dd class="col-7">
+                        <!-- UPDATED: Use -lt class and Vietnamese text -->
+                        <span class="badge @(Model.IsActive ? "bg-primary-lt" : "bg-secondary-lt")">
+                            @(Model.IsActive ? "Đang sử dụng" : "Không sử dụng")
+                        </span>
+                    </dd>
+
+                    <dt class="col-5 text-muted">Phòng tạo</dt>
+                    <dd class="col-7">@(Model.CreatedDepartmentID ?? "-")</dd>
+
+                    <dt class="col-5 text-muted">Người tạo</dt>
+                    <dd class="col-7">@(Model.CreatedByUserName ?? "-")</dd>
+
+                    <dt class="col-5 text-muted">Ngày tạo</dt>
+                    <dd class="col-7">@(Model.CreationTimestamp?.ToString("dd/MM/yyyy HH:mm") ?? "-")</dd>
+
+                    <dt class="col-5 text-muted">Người sửa cuối</dt>
+                    <dd class="col-7">@(Model.LastModifiedByUserName ?? "-")</dd>
+
+                    <dt class="col-5 text-muted">Ngày sửa cuối</dt>
+                    <dd class="col-7">@(Model.LastModificationTimestamp?.ToString("dd/MM/yyyy HH:mm") ?? "-")</dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Right column: HTML content preview -->
+        <div class="content-panel card">
+            <div class="card-header py-2">
+                <h3 class="card-title mb-0">Nội dung tài liệu</h3>
+            </div>
+            <div class="card-body p-0 d-flex flex-column">
+                @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
+                {
+                    <div id="html-preview" class="document-preview">
+                        <div class="document-page">
+                            @Html.Raw(Model.HtmlContent)
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center justify-content-center flex-grow-1 text-muted">
+                        <p class="mt-2">Không có file template để hiển thị.</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link href="~/css/template/details.css" rel="stylesheet" />
+}
+
+@section Scripts {
+    @Html.AntiForgeryToken()
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Xử lý click nút Ánh xạ
+            const mappingBtn = document.getElementById('btnMapping');
+            if (mappingBtn) {
+                mappingBtn.addEventListener('click', () => {
+                    const templateId = mappingBtn.dataset.templateId;
+                    if (!templateId) return;
+
+                    // Lấy token chống CSRF
+                    const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                    const token = tokenInput ? tokenInput.value : null;
+
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/Template/Mapping/${templateId}`;
+                    if (token) {
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = '__RequestVerificationToken';
+                        hidden.value = token;
+                        form.appendChild(hidden);
+                    }
+                    document.body.appendChild(form);
+                    form.submit();
+                });
+            }
+
+            // Logic để highlight placeholder nếu là template đã mapped
+            const isMapped = '@Model.Status'.toLowerCase() === 'mapped';
+            if (isMapped) {
+                const container = document.getElementById('html-preview');
+                if (container) {
+                    // Highlight các placeholder đã có sẵn trong HTML từ backend
+                    // HTML đã được render với class 'mapped-field' từ DocxToStructuredHtmlService
+                    console.log('Template đã được mapped, các placeholder sẽ được highlight tự động.');
+                }
+            }
+        });
+    </script>
+}

@@ -1,0 +1,27 @@
+@* File Partial View này giờ chỉ chứa cấu trúc HTML cơ bản cho bảng.
+    DataTables.net sẽ tự động điền dữ liệu vào tbody thông qua AJAX.
+    Không cần @model IEnumerable<...> nữa.
+*@
+
+<div class="table-responsive">
+    <table id="khachHangTable" class="table table-vcenter table-nowrap table-striped table-bordered table-datatable" style="width:100%;">
+        <thead class="table-light">
+            <tr>
+                @* DataTables sẽ tự động tạo header dựa trên cấu hình 'columns' trong JavaScript.
+                    Hoặc bạn có thể để các <th> trống ở đây, và DataTables sẽ sử dụng 'title' từ cấu hình JS.
+                    Để rõ ràng, bạn có thể định nghĩa các <th> với tên cột mong muốn.
+                    DataTables sẽ sử dụng chúng nếu không có 'title' trong JS, hoặc bạn có thể bỏ trống.
+                *@
+                <th>Số CIF</th>
+                <th>Tên CIF</th>
+                <th>User thực hiện</th>
+                <th>Ngày cập nhật</th>
+                <th>Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @* Phần tbody này sẽ được DataTables.net tự động điền dữ liệu *@
+            @* Không cần vòng lặp @foreach ở đây nữa *@
+        </tbody>
+    </table>
+</div>

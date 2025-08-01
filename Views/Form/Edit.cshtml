@@ -1,0 +1,184 @@
+@model CTOM.ViewModels.Form.FormEditViewModel
+@{
+    ViewData["Title"] = "Cập nhật dữ liệu";
+}
+
+<!-- THÊM MỚI: Link tới file CSS riêng cho trang Edit -->
+<link rel="stylesheet" href="~/css/form/form-edit.css" asp-append-version="true" />
+
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    <i class="ti ti-edit me-2"></i>
+                    @ViewData["Title"]
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div id="notificationPlaceholder">
+            @if (ViewData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible bg-success-lt" role="alert">
+                    @ViewData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            @if (ViewData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger alert-important alert-dismissible bg-yellow-lt" role="alert">
+                    @ViewData["ErrorMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+        </div>
+
+        <!-- THAY ĐỔI: Sử dụng cấu trúc layout 2 cột đồng nhất -->
+        <div class="main-layout two-column">
+            <!-- CỘT TRÁI: FORM NHẬP LIỆU -->
+            <div class="form-input-area">
+                <form id="editForm" asp-action="Edit" asp-route-id="@Model.FormDataID" method="post" class="card h-100 d-flex flex-column">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="FormDataID" />
+                    <input type="hidden" asp-for="TemplateId" />
+
+                    <div class="card-header py-2">
+                        <h3 class="card-title mb-0">Nhập dữ liệu</h3>
+                    </div>
+                    <div class="card-body overflow-auto">
+                        <!-- THÔNG TIN CHUNG -->
+                        <fieldset class="form-fieldset">
+                            <div class="row mb-3">
+                                <label class="col-sm-4 col-form-label">Tên template</label>
+                                <div class="col-sm-8">
+                                    <input type="text" asp-for="TemplateName" class="form-control bg-light" readonly />
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <label asp-for="Note" class="col-sm-4 col-form-label"></label>
+                                <div class="col-sm-8">
+                                    <textarea asp-for="Note" class="form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!-- THÔNG TIN CHI TIẾT (ĐỘNG) -->
+                        <fieldset class="form-fieldset mt-3">
+                             <div id="dynamicFieldsContainer">
+                                <div class="text-center p-5"><div class="spinner-border"></div></div>
+                             </div>
+                        </fieldset>
+                    </div>
+                    <div class="card-footer text-end bg-white mt-auto">
+                        <a asp-action="Index" class="btn btn-secondary me-auto">
+                            <i class="ti ti-arrow-back me-2"></i>Danh sách
+                        </a>
+                        &nbsp;
+                        <button id="btnSave" class="btn btn-primary" type="submit">
+                            <i class="ti ti-device-floppy me-2"></i>Lưu
+                        </button>
+                        <button type="button" id="btnReview" class="btn btn-info ms-2" data-form-id="@Model.FormDataID" data-template-id="@Model.TemplateId">
+                            <i class="ti ti-eye me-2"></i>Tài liệu đã lưu
+                        </button>
+                        <button type="button" id="btnDownload" class="btn btn-success ms-2" data-form-id="@Model.FormDataID" data-template-id="@Model.TemplateId">
+                            <i class="ti ti-download me-2"></i>Tải file (docx)
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <!-- CỘT PHẢI: HTML PREVIEW -->
+            <div class="preview-area">
+                <div class="card h-100 d-flex flex-column">
+                    <div class="card-header py-2">
+                        <h3 class="card-title mb-0">Xem trước thay đổi</h3>
+                    </div>
+                    <div class="card-body" id="preview-pane-body">
+                        <!-- THAY ĐỔI: Vùng preview mới sử dụng HTML từ server -->
+                        <div class="document-preview" id="htmlPreviewContainer">
+                             <div class="document-page" id="html-preview">
+                                @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
+                                {
+                                    @Html.Raw(Model.HtmlContent)
+                                }
+                                else
+                                {
+                                    <div class="text-center p-5 text-muted">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-off"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 3l18 18" /><path d="M7 3h7l5 5v7m0 4a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-14" /></svg>
+                                        <p class="mt-2">Không có nội dung xem trước cho template này.</p>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem trước (giữ nguyên) -->
+<div class="modal modal-blur fade" id="mergePreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Xem tài liệu đã lưu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="mergePreviewBody">
+                <div class="text-center p-5"><div class="spinner-border"></div><p class="mt-2">Đang xử lý...</p></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn me-auto" data-bs-dismiss="modal"><i class="ti ti-x me-2"></i>Đóng</button>
+                <button type="button" class="btn btn-success" id="modalDownloadBtn" disabled><i class="ti ti-download me-2"></i>Tải file (docx)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận (giữ nguyên) -->
+<div class="modal fade" id="customModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div id="modalStatus" class="modal-status bg-primary"></div>
+            <div class="modal-body text-center py-4">
+                <i id="modalIcon" class="ti ti-info-circle" style="font-size: 3rem;"></i>
+                <h4 id="modalTitle" class="mt-2">Thông báo</h4>
+                <div id="modalMessage" class="text-muted"></div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button id="modalCancelBtn" type="button" class="btn w-100" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="col">
+                            <button id="modalConfirmBtn" type="button" class="btn btn-primary w-100"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- THAY ĐỔI: Loại bỏ docx-preview.js -->
+    <script src="~/lib/pizzip/dist/pizzip.min.js"></script>
+    <script src="~/lib/docxtemplater/build/docxtemplater.js"></script>
+    <script src="~/lib/file-saver/dist/FileSaver.min.js"></script>
+
+    <!-- Pass initial data from Server to Client -->
+    <script>
+        window.initialFormData = @Html.Raw(Model.FormDataJson ?? "{}");
+    </script>
+
+    <!-- THAY ĐỔI: Sử dụng file JS đã được nâng cấp -->
+    <script src="~/js/form/form-common.js" asp-append-version="true"></script>
+    <script src="~/js/form/form-edit.js" asp-append-version="true"></script>
+}

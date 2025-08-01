@@ -1,0 +1,246 @@
+﻿@model CTOM.ViewModels.CreateUserViewModel
+
+@{
+    ViewData["Title"] = "Tạo mới Người dùng";
+}
+
+<div class="container mt-4">
+    <div class="card col-md-8 mx-auto">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title fw-bold">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-plus me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>
+                @ViewData["Title"]
+            </h3>
+        </div>
+        <div class="card-body">
+            @* Đặt ID cho form và autocomplete="off" *@
+            <form id="createUserForm" asp-action="Create" method="post" autocomplete="off">
+                @Html.AntiForgeryToken()
+
+                @* Validation Summary *@
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState.TryGetValue(string.Empty, out var modelStateEntry) && modelStateEntry.Errors.Count > 0)
+                {
+                    <div class="alert alert-danger alert-important mb-3" role="alert">
+                        <h4 class="alert-title">Vui lòng sửa các lỗi sau:</h4>
+                        <ul>
+                            @foreach (var error in modelStateEntry.Errors)
+                            {
+                                <li>@error.ErrorMessage</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="UserName" class="form-label required"></label>
+                            @* Đặt ID và autocomplete *@
+                            <input asp-for="UserName" id="UserNameInput" class="form-control" placeholder="Nhập mã user (dùng để đăng nhập)" autocomplete="off" />
+                            <span asp-validation-for="UserName" class="text-danger d-block"></span>
+                            @* Placeholder cho kết quả kiểm tra AJAX *@
+                            <span id="userNameCheckResult" class="form-text mt-1"></span> @* Thêm mt-1 tạo khoảng cách nhỏ *@
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="TenUser" class="form-label required"></label>
+                            <input asp-for="TenUser" class="form-control" placeholder="Nhập họ và tên đầy đủ" />
+                            <span asp-validation-for="TenUser" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label required"></label>
+                            <input asp-for="Password" type="password" class="form-control" placeholder="Nhập mật khẩu (ít nhất 6 ký tự)" autocomplete="new-password" />
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="ConfirmPassword" class="form-label required"></label>
+                            <input asp-for="ConfirmPassword" type="password" class="form-control" placeholder="Nhập lại mật khẩu" autocomplete="new-password" />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="MaPhong" class="form-label required"></label>
+                            <select asp-for="MaPhong" class="form-select" asp-items="@Model.AvailablePhongBan">
+                                <option value="">--- Chọn phòng ban ---</option>
+                            </select>
+                            <span asp-validation-for="MaPhong" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="TrangThai" class="form-label required"></label>
+                            <select asp-for="TrangThai" class="form-select">
+                                <option value="A">Active</option>
+                                <option value="D">Disabled</option>
+                            </select>
+                            <span asp-validation-for="TrangThai" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                @* Checkbox Nhóm Quyền (dùng form-check) *@
+                <div class="mb-3">
+                    <label class="form-label">Nhóm quyền</label>
+                    <div class="border p-2 rounded">
+                        @* Thêm border và padding *@
+                        @if (Model.AvailableRoles != null && Model.AvailableRoles.Any())
+                        {
+                            @foreach (var role in Model.AvailableRoles)
+                            {
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="SelectedRoleNames"
+                                           value="@role.Value"
+                                           id="role-@role.Value">
+                                    <label class="form-check-label" for="role-@role.Value">
+                                        @role.Text
+                                    </label>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">Không có nhóm quyền nào để chọn.</p> @* Bỏ margin bottom *@
+                        }
+                    </div>
+                    @* <span asp-validation-for="SelectedRoleNames" class="text-danger"></span> *@
+                </div>
+
+                @* Nút bấm *@
+                <div class="mt-4 d-flex">
+                    @* Đặt ID cho nút submit *@
+                    <button type="submit" id="createUserSubmitButton" class="btn btn-primary shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-floppy me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>
+                        Lưu thông tin
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary ms-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-back-up me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9 14l-4 -4l4 -4" /><path d="M5 10h11a4 4 0 1 1 0 8h-1" /></svg>
+                        Quay lại danh sách
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @* <partial name="_CoreValidationScriptsPartial" /> *@
+
+    <script>
+    $(document).ready(function () {
+    const userNameInput = $('#UserNameInput');
+    const userNameCheckResult = $('#userNameCheckResult');
+    const submitButton = $('#createUserSubmitButton');
+    let isUserNameAvailable = false;
+    let currentCheckXhr = null;
+    const MIN_USERNAME_LENGTH = 3; // Độ dài tối thiểu để kiểm tra
+    let checkTimeout = null;
+
+    // Hàm kiểm tra username
+    function checkUsername(userNameValue) {
+        // Xóa timeout cũ nếu có
+        if (checkTimeout) {
+            clearTimeout(checkTimeout);
+        }
+
+        // Reset trạng thái
+        userNameCheckResult.empty().removeClass('text-success text-danger is-loading');
+        userNameInput.removeClass('is-valid is-invalid');
+        isUserNameAvailable = false;
+        submitButton.prop('disabled', false);
+
+        // Kiểm tra độ dài username
+        if (!userNameValue || userNameValue.length < MIN_USERNAME_LENGTH) {
+            if (userNameValue.length > 0) {
+                userNameCheckResult.html(`<span class="text-muted">Nhập ít nhất ${MIN_USERNAME_LENGTH} ký tự</span>`);
+            }
+            return;
+        }
+
+        // Hiển thị trạng thái đang kiểm tra
+        userNameCheckResult.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang kiểm tra...').addClass('is-loading');
+        submitButton.prop('disabled', true);
+
+        // Hủy yêu cầu trước đó nếu có
+        if (currentCheckXhr) {
+            currentCheckXhr.abort();
+        }
+
+        // Gửi yêu cầu kiểm tra sau 500ms (debounce)
+        checkTimeout = setTimeout(() => {
+            currentCheckXhr = $.ajax({
+                //url: '/NguoiSuDung/CheckUserNameExists',
+                url: '@Url.Action("CheckUserNameExists", "NguoiSuDung")',
+                type: 'GET',
+                data: { userName: userNameValue },
+                success: function (data) {
+                    userNameCheckResult.empty().removeClass('is-loading');
+                    if (data.exists) {
+                        userNameCheckResult.html('<span class="text-danger">✗ ' + (data.message || 'Tên đăng nhập đã tồn tại.') + '</span>');
+                        userNameInput.removeClass('is-valid').addClass('is-invalid');
+                        isUserNameAvailable = false;
+                    } else {
+                        userNameCheckResult.html('<span class="text-success">✓ ' + (data.message || 'Tên đăng nhập hợp lệ.') + '</span>');
+                        userNameInput.removeClass('is-invalid').addClass('is-valid');
+                        isUserNameAvailable = true;
+                    }
+                    submitButton.prop('disabled', !isUserNameAvailable);
+                },
+                error: function (xhr, status, error) {
+                    if (status !== 'abort') {
+                        console.error("Lỗi kiểm tra username:", status, error);
+                        userNameCheckResult.empty().removeClass('is-loading')
+                            .html('<span class="text-warning">! Lỗi kiểm tra.</span>');
+                        isUserNameAvailable = false;
+                        submitButton.prop('disabled', false);
+                    }
+                },
+                complete: function() {
+                    currentCheckXhr = null;
+                }
+            });
+        }, 500);
+    }
+
+    // Sự kiện khi người dùng nhập liệu
+    userNameInput.on('input', function() {
+        const userNameValue = $(this).val().trim();
+        checkUsername(userNameValue);
+    });
+
+    // Sự kiện khi blur khỏi ô input
+    userNameInput.on('blur', function() {
+        const userNameValue = $(this).val().trim();
+        if (userNameValue.length > 0 && userNameValue.length < MIN_USERNAME_LENGTH) {
+            //userNameCheckResult.html(`<span class="text-danger">Tên đăng nhập phải có ít nhất ${MIN_USERNAME_LENGTH} ký tự</span>`);
+            userNameInput.addClass('is-invalid');
+            isUserNameAvailable = false;
+            submitButton.prop('disabled', true);
+        }
+    });
+
+    // Ngăn submit nếu nút bị disable
+    $('#createUserForm').on('submit', function(event) {
+        if (submitButton.prop('disabled')) {
+            event.preventDefault();
+            if (userNameInput.val().trim().length < MIN_USERNAME_LENGTH) {
+                userNameCheckResult.html(`<span class="text-danger">Tên đăng nhập phải có ít nhất ${MIN_USERNAME_LENGTH} ký tự</span>`);
+            }
+            userNameInput.focus();
+        }
+    });
+});
+    </script>
+}

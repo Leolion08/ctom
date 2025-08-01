@@ -1,0 +1,145 @@
+@model IEnumerable<CTOM.Models.Entities.ApplicationRole>
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@{
+    ViewData["Title"] = "Danh sách Nhóm quyền";
+    var requestToken = Xsrf.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title text-uppercase">@ViewData["Title"]</h3>
+        <div class="card-actions">
+            <a asp-action="Create" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-shield-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" /><path d="M11 11h1v2v1h-1z" /><path d="M16 11h-2.5" /><path d="M13.5 11v-2.5" /></svg>
+                Tạo mới Nhóm quyền
+            </a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        @* <table id="nhomQuyenTable" class="table card-table table-vcenter text-nowrap datatable"> *@
+            <table id="nhomQuyenTable" class="table table-hover table-bordered align-middle card-table table-vcenter text-nowrap text-center">
+            <thead >
+                <tr>
+                    <th>ID</th> @* Vẫn hiển thị ID để tham khảo *@
+                    <th>Mã nhóm</th> @* Chính là Name *@
+                    <th>Tên nhóm</th>
+                    <th>Trạng Thái</th>
+                    <th data-orderable="false">&nbsp;</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr id="row-@item.Id">
+                        @* ID của dòng vẫn dùng Id GUID để đảm bảo duy nhất tuyệt đối *@
+                        <td>@Html.DisplayFor(modelItem => item.Id)</td>
+                        <td>@(item.Name ?? string.Empty)</td>
+                        <td>@(item.TenNhomDayDu ?? string.Empty)</td>
+                        <td>
+
+                            @if (item.TrangThai == "A")
+                            {
+                                <span class="badge bg-success-subtle">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger-subtle">Disabled</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="btn-list flex-nowrap w-100 d-flex justify-content-center">
+                                @* Sửa route parameter thành asp-route-roleName *@
+                                @if (!string.IsNullOrEmpty(item.Name))
+                                {
+                                    <a asp-action="Details" asp-route-roleName="@item.Name" class="btn btn-outline-info">Chi tiết</a>
+                                    <a asp-action="Edit" asp-route-roleName="@item.Name" class="btn btn-outline-yellow">Sửa</a>
+                                }
+
+                                @if (!string.IsNullOrEmpty(item.Name) && !item.Name.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <button type="button" class="btn btn-outline-danger delete-confirmation-button"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#deleteRoleModal"
+                                            data-id="@item.Name"
+                                            data-name="@item.Name">
+                                        Xóa
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@* --- HTML CHO MODAL XÁC NHẬN XÓA ROLE (Chuẩn hóa ID span) --- *@
+<div class="modal modal-blur fade" id="deleteRoleModal" tabindex="-1" aria-labelledby="deleteRoleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                <i class="ti ti-alert-triangle text-danger" style="font-size: 3rem;"></i>
+                <h3>Xác nhận xóa?</h3>
+                @* Chuẩn hóa ID span và bỏ phần ID *@
+                <div class="text-muted">Bạn có chắc chắn muốn xóa nhóm quyền <strong id="modalItemName"></strong>? Người dùng thuộc nhóm quyền này sẽ mất quyền tương ứng. Hành động này không thể hoàn tác.</div>
+
+                @* <div class="text-muted">Bạn có chắc chắn muốn xóa nhóm quyền <strong id="roleNameToDelete"></strong>? Người dùng thuộc nhóm quyền này sẽ mất quyền tương ứng. Hành động này không thể hoàn tác.</div> *@
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col"><a href="#" class="btn w-100" data-bs-dismiss="modal">Hủy bỏ</a></div>
+                        <div class="col"><button type="button" id="confirmDeleteRoleButton" class="btn btn-danger w-100">Xác nhận Xóa</button></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@* --- HẾT HTML CHO MODAL --- *@
+
+
+@section Scripts {
+    <partial name="_CoreValidationScriptsPartial" />
+
+    <script>
+        //const antiForgeryToken = '@requestToken';
+
+        $(document).ready(function () {
+            // 1. Khởi tạo DataTables
+            var nhomQuyenDataTable = $('#nhomQuyenTable').DataTable({
+                pageLength: 10,
+                lengthMenu: [ [10, 25, 50, -1], [10, 25, 50, "Tất cả"] ],
+                order: [[1, 'asc']], // Sắp xếp theo cột Mã nhóm (index = 1)
+                columnDefs: [
+                    { targets: 4, orderable: false } // Cột Hành động (index 4) không sắp xếp
+                 ],
+                 headerCallback: function(thead, data, start, end, display) {
+                    // Duyệt qua từng phần tử <th> và thêm lớp CSS mà không ảnh hưởng tới các ID hoặc thuộc tính mặc định của <thead>
+                    $(thead).find('th').each(function() {
+                        $(this).addClass('bg-primary-lt text-center text-muted');
+                    });
+                }
+            });
+
+            // 2. Gọi hàm khởi tạo modal xóa dùng chung từ site.modal-delete.js
+            // confirmButtonId: không truyền ký tự '#'
+            initializeDeleteModal({
+                modalId: '#deleteRoleModal',                // ID của modal HTML
+                triggerButtonSelector: '.delete-confirmation-button', // Class của các nút xóa
+                confirmButtonId: 'confirmDeleteRoleButton',        // ID của nút xác nhận trong modal (CẦN BỎ #)
+                nameElementSelector: '#modalItemName',          // ID span hiển thị tên trong modal
+                // idElementSelector: null,                    // Không cần hiển thị ID trong modal này
+                dataIdAttribute: 'data-id',                 // Thuộc tính data-* chứa ID (là Name) trên nút xóa
+                dataNameAttribute: 'data-name',               // Thuộc tính data-* chứa Tên trên nút xóa
+                deleteUrlTemplate: '@Url.Action("Delete", "NhomQuyen")/{id}',  // Mẫu URL xóa (placeholder {id} sẽ được thay bằng Name)
+                dataTableInstance: nhomQuyenDataTable,        // Instance của DataTables
+                antiForgeryToken: '@requestToken',            // Token chống giả mạo
+                entityName: 'nhóm quyền'                   // Tên gọi đối tượng để hiển thị thông báo
+            });
+        });
+    </script>
+}

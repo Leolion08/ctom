@@ -1,0 +1,298 @@
+[
+	{
+		"BusinessOperationID": 1,
+		"OperationName": "Tín dụng (DN)",
+		"Description": "Nghiệp vụ tín dụng cho khách hàng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5566667",
+		"CustomerType": "DN"
+	},
+	{
+		"BusinessOperationID": 2,
+		"OperationName": "Tiền gửi (DN)",
+		"Description": "Nghiệp vụ tiền gửi cho khách hàng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5566667",
+		"CustomerType": "DN"
+	},
+	{
+		"BusinessOperationID": 3,
+		"OperationName": "Dịch vụ (DN)",
+		"Description": "Nghiệp vụ dịch vụ cho khách hàng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5566667",
+		"CustomerType": "DN"
+	},
+	{
+		"BusinessOperationID": 4,
+		"OperationName": "Nghiệp vụ cá nhân (CN)",
+		"Description": "Nghiệp vụ cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5566667",
+		"CustomerType": "CN"
+	},
+	{
+		"BusinessOperationID": 5,
+		"OperationName": "Định giá TSBĐ",
+		"Description": "Định giá tài sản bảo đảm",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 6,
+		"OperationName": "Thế chấp TSBĐ",
+		"Description": "Thế chấp tài sản bảo đảm",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 7,
+		"OperationName": "Mượn thay thế TSBĐ",
+		"Description": "Mượn thay thế tài sản bảo đảm",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 8,
+		"OperationName": "Rút TSBĐ",
+		"Description": "Rút tài sản bảo đảm",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 9,
+		"OperationName": "Hợp đồng bảo đảm",
+		"Description": "Hợp đồng bảo đảm tín dụng",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 10,
+		"OperationName": "Hợp đồng tín dụng (DN)",
+		"Description": "Hợp đồng tín dụng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 11,
+		"OperationName": "Giải ngân theo HM",
+		"Description": "Giải ngân theo hạn mức tín dụng",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 12,
+		"OperationName": "Bảo lãnh theo HM",
+		"Description": "Bảo lãnh theo hạn mức tín dụng",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 13,
+		"OperationName": "LC theo HM",
+		"Description": "LC theo hạn mức tín dụng",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 14,
+		"OperationName": "Giải ngân theo món",
+		"Description": "Giải ngân theo món tín dụng",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 15,
+		"OperationName": "Bảo lãnh theo món",
+		"Description": "Bảo lãnh theo món tín dụng",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 16,
+		"OperationName": "Biên bản kiểm tra",
+		"Description": "Biên bản kiểm tra tín dụng",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 17,
+		"OperationName": "Thu nợ",
+		"Description": "Nghiệp vụ thu nợ",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 1
+	},
+	{
+		"BusinessOperationID": 18,
+		"OperationName": "Hợp đồng tiền gửi",
+		"Description": "Hợp đồng tiền gửi cho khách hàng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 2
+	},
+	{
+		"BusinessOperationID": 19,
+		"OperationName": "Mở tài khoản (TK)",
+		"Description": "Mở tài khoản cho khách hàng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 3
+	},
+	{
+		"BusinessOperationID": 20,
+		"OperationName": "iBank",
+		"Description": "Dịch vụ iBank cho khách hàng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 3
+	},
+	{
+		"BusinessOperationID": 21,
+		"OperationName": "Đo lường",
+		"Description": "Dịch vụ đo lường cho khách hàng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 3
+	},
+	{
+		"BusinessOperationID": 22,
+		"OperationName": "Giao dịch qua fax",
+		"Description": "Giao dịch qua fax cho khách hàng doanh nghiệp",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "DN",
+		"ParentOperationID": 3
+	},
+	{
+		"BusinessOperationID": 23,
+		"OperationName": "Hợp đồng tín dụng (CN)",
+		"Description": "Hợp đồng tín dụng cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "CN",
+		"ParentOperationID": 4
+	},
+	{
+		"BusinessOperationID": 24,
+		"OperationName": "Bảng kê rút vốn (CN)",
+		"Description": "Bảng kê rút vốn cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "CN",
+		"ParentOperationID": 4
+	},
+	{
+		"BusinessOperationID": 25,
+		"OperationName": "Ủy nhiệm chi (CN)",
+		"Description": "Ủy nhiệm chi cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "CN",
+		"ParentOperationID": 4
+	},
+	{
+		"BusinessOperationID": 26,
+		"OperationName": "Hợp đồng thế chấp (CN)",
+		"Description": "Hợp đồng thế chấp cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "CN",
+		"ParentOperationID": 4
+	},
+	{
+		"BusinessOperationID": 27,
+		"OperationName": "Biên bản định giá (CN)",
+		"Description": "Biên bản định giá cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "CN",
+		"ParentOperationID": 4
+	},
+	{
+		"BusinessOperationID": 28,
+		"OperationName": "Biên bản bàn giao (CN)",
+		"Description": "Biên bản bàn giao cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "CN",
+		"ParentOperationID": 4
+	},
+	{
+		"BusinessOperationID": 29,
+		"OperationName": "Thỏa thuận cam kết tài sản (CN)",
+		"Description": "Thỏa thuận cam kết tài sản cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "CN",
+		"ParentOperationID": 4
+	},
+	{
+		"BusinessOperationID": 30,
+		"OperationName": "Thỏa thuận chi hộ (CN)",
+		"Description": "Thỏa thuận chi hộ cho khách hàng cá nhân",
+		"IsActive": true,
+		"CreatedBy": "System",
+		"CreatedDate": "2025-06-11T15:34:36.5800000",
+		"CustomerType": "CN",
+		"ParentOperationID": 4
+	}
+]

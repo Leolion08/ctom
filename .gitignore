@@ -1,0 +1,376 @@
+## --- .NET Core ---
+bin/
+obj/
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userprefs
+*.dbmdl
+*.jfm
+
+## --- Bundled and minified files ---
+wwwroot/**/*.min.js
+wwwroot/**/*.min.css
+wwwroot/**/*.bundle.*
+*.pfx
+*.publishsettings
+*.ncrunchsolution
+*.ncrunchproject
+*.DotSettings.*
+*.dotCover
+*.pidb
+*.log
+*.sln.ide
+*.vspscc
+*.vssscc
+*.sln.ide
+*.vs/
+
+## --- Build results ---
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+## --- IDE specific files ---
+## JetBrains Rider
+.idea/
+*.sln.iml
+
+## --- Keys ---
+Keys/
+
+## --- docs ---
+docs/
+
+## --- scripts ---
+scripts/
+
+## --- Template files ---
+TemplatesData/
+
+## --- Local temp files ---
+Temp/
+
+## --- Old files ---
+old/
+
+## VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+## Windsurf
+.windsurf/*
+
+## --- User specific files ---
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sln
+
+## --- Environment specific files ---
+appsettings.*.json
+!appsettings.json
+!appsettings.*.sample.json
+
+## --- User secrets ---
+secrets.json
+**/secrets.json
+secrets/
+**/secrets/
+
+## --- Logs and reports ---
+*.log
+*.dmp
+*.csv
+*.dat
+*.out
+*.sql
+*.sqlite
+*.sqlite3
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.htm
+
+## --- Node.js ---
+node_modules/
+wwwroot/lib/
+wwwroot/node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+## --- Packages ---
+*.nupkg
+*.nupkg.metadata
+*.nupkg.sha512
+
+## --- Local development ---
+*.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.orig
+*.bak
+*.tmp
+
+## --- Publish output ---
+publish/
+*.publish.xml
+
+## --- VS Code settings ---
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+## --- Visual Studio Code ---
+.history/
+
+## --- Visual Studio ---
+*.VC.db
+*.VC.VC.opendb
+*.vspscc
+*.vssscc
+.vs/
+
+## --- OS generated files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+## --- Project specific ---
+# File cấu hình local
+appsettings.Local.json
+appsettings.*.Development.json
+
+# File bí mật
+*.pfx
+*.cer
+*.key
+*.p12
+*.pem
+*.crt
+
+# File tạm
+*.tmp
+*.temp
+
+# File backup
+*.bak
+*.backup
+
+# File dump
+*.dmp
+
+# File nhạy cảm
+*.publishsettings
+*.pubxml
+*.pubxml.user
+
+# File test
+TestResults/
+*.trx
+*.coverage
+
+# File SQL Server
+*.mdf
+*.ldf
+*.ndf
+
+# File Redis
+*.rdb
+*.aof
+
+# File Elasticsearch
+#data/
+
+# File Docker
+.docker/
+
+# File IDE
+.idea/
+*.sln.ide/
+*.sln.ide
+
+# File Visual Studio
+*.userosscache
+*.sln.docstates
+*.vs/
+*.vspscc
+*.vssscc
+
+# File ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# File NVelocity
+*.generated.cs
+*.generated.vb
+
+# File Visual Studio 6
+*.vbw
+*.vsp
+*.vspx
+
+# File Visual Studio LightSwitch
+**/*.HTMLClient/GeneratedArtifacts
+**/*.DesktopClient/GeneratedArtifacts
+**/*.DesktopClient/ModelManifest.xml
+**/*.Server/GeneratedArtifacts
+**/*.Server/ModelManifest.xml
+_Pvt_Extensions
+
+# File paket
+.paket/paket.exe
+paket-files/
+
+# File FAKE
+.fake/
+
+# File JetBrains Rider
+.idea/
+*.sln.iml
+
+# File CodeRush
+.cr/
+
+# File Python Tools for Visual Studio (PTVS)
+__pycache__/
+*.pyc
+
+# File Cake
+tools/**
+!tools/packages.config
+
+# File Tabs Studio
+*.tss
+
+# File Telerik's JustMock
+*.pdb
+*.pdbold
+*.pdbnew
+
+# File Visual C++
+*.sln.ide/
+*.sln.ide
+
+# File Visual Studio 2015
+*.sln.docstates
+
+# File Visual Studio 2017
+.vs/
+*.vspscc
+*.vssscc
+
+# File Visual Studio 2019
+.vs/
+*.vspscc
+*.vssscc
+
+# File Visual Studio 2022
+.vs/
+*.vspscc
+*.vssscc
+
+# File Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# File Visual Studio for Mac
+*.userprefs
+*.usertasks
+
+# File Xamarin Studio
+*.userprefs
+*.usertasks
+
+# File MonoDevelop
+*.userprefs
+*.usertasks
+
+# File Rider
+.idea/
+*.sln.iml
+
+# File Visual Studio Code - User specific settings
+.vscode/
+
+# File Visual Studio Code - Workspace settings
+.vscode/
+
+# File Visual Studio Code - Extensions
+.vscode/extensions/
+
+# File Visual Studio Code - Debug logs
+.vscode/debugLogs/
+
+# File Visual Studio Code - Workspace storage
+.vscode/workspaceStorage/
+
+# File Visual Studio Code - Machine specific settings
+.vscode/machineid
+
+# File Visual Studio Code - User settings
+.vscode/settings.json
+
+# File Visual Studio Code - Workspace settings
+.vscode/settings.json
+
+# File Visual Studio Code - Keybindings
+.vscode/keybindings.json
+
+# File Visual Studio Code - Snippets
+.vscode/snippets/
+
+# File Visual Studio Code - Workspace state
+.vscode/workspace.json
+
+# File Visual Studio Code - Tasks
+.vscode/tasks.json
+
+# File Visual Studio Code - Launch configurations
+.vscode/launch.json
+
+# File Visual Studio Code - Extensions metadata
+.vscode/extensions.json
+
+# File Visual Studio Code - Workspace trust
+.vscode/trusted-folders.json
+
+# File Visual Studio Code - Workspace trust
+.vscode/trusted-folders.json
+
+# File Visual Studio Code - Workspace trust
+.vscode/trusted-folders.json
+
+# File Visual Studio Code - Workspace trust
+.vscode/trusted-folders.json

@@ -1,0 +1,162 @@
+@model IEnumerable<CTOM.Models.Entities.PhongBan>
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf // Inject Antiforgery để lấy token cho AJAX
+
+@{
+    ViewData["Title"] = "Danh sách Phòng Ban";
+    // Lấy token để dùng trong JavaScript
+    var requestToken = Xsrf.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div class="card"> @* Bọc nội dung trong card của Tabler *@
+    <div class="card-header">
+        <h3 class="card-title text-uppercase">@ViewData["Title"]</h3>
+        <div class="card-actions">
+            <a asp-action="Create" class="btn btn-primary">
+                 @* <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg> *@
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-building-plus"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 21h9" /><path d="M9 8h1" /><path d="M9 12h1" /><path d="M9 16h1" /><path d="M14 8h1" /><path d="M14 12h1" /><path d="M5 21v-16c0 -.53 .211 -1.039 .586 -1.414c.375 -.375 .884 -.586 1.414 -.586h10c.53 0 1.039 .211 1.414 .586c.375 .375 .586 .884 .586 1.414v7" /><path d="M16 19h6" /><path d="M19 16v6" /></svg>
+                Thêm phòng mới
+            </a>
+        </div>
+    </div>
+    <div class="card-body border-bottom py-3">
+         @* Thêm các bộ lọc nếu cần ở đây *@
+    </div>
+    <div class="table-responsive"> @* Đảm bảo bảng hiển thị tốt trên mobile *@
+        @* Thêm id="phongBanTable" cho bảng *@
+        @* <table id="phongBanTable" class="table card-table table-vcenter text-nowrap datatable">  *@
+        <table id="phongBanTable" class="table table-hover table-bordered align-middle card-table table-vcenter text-nowrap text-center">
+            <thead>
+                <tr>
+                    <th>Mã Phòng</th>
+                    <th>Mã Phòng HR</th>
+                    <th>Tên Phòng Ban</th>
+                    <th>Tên Viết Tắt</th>
+                    <th>Trạng Thái</th>
+                    <th data-orderable="false">&nbsp;</th> @* Thêm data-orderable="false" nếu không muốn sắp xếp cột này *@
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model) {
+                    <tr id="row-@item.MaPhong">
+                        @* Thêm ID cho dòng để dễ xóa bằng JS *@
+
+                    <td>@Html.DisplayFor(modelItem => item.MaPhong)</td>
+                    <td>@Html.DisplayFor(modelItem => item.MaPhongHR)</td>
+                    <td>@Html.DisplayFor(modelItem => item.TenPhong)</td>
+                    <td>@Html.DisplayFor(modelItem => item.TenVietTat)</td>
+                    <td>
+                        @if (item.TrangThai == "A")
+                        {
+                            <span class="badge bg-success-subtle">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger-subtle">Disabled</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="btn-list flex-nowrap w-100 d-flex justify-content-center">
+                            @* Gom nút vào group *@
+                            <a asp-action="Details" asp-route-maPhong="@item.MaPhong" class="btn btn-outline-info">Chi tiết</a>&nbsp;
+                            <a asp-action="Edit" asp-route-maPhong="@item.MaPhong" class="btn btn-outline-yellow">Sửa</a>&nbsp;
+
+                            <button type="button" class="btn btn-outline-danger delete-confirmation-button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#deleteConfirmModal"
+                                    data-id="@item.MaPhong"
+                                    data-name="@item.TenPhong">
+                                Xóa
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+     @* Phần phân trang và hiển thị số lượng sẽ do DataTables tự tạo *@
+</div>
+
+@* --- THÊM HTML CHO MODAL XÁC NHẬN XÓA --- *@
+<div class="modal modal-blur fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-danger"></div> @* Thêm màu trạng thái danger *@
+            <div class="modal-body text-center py-4">
+                <i class="ti ti-alert-triangle text-danger" style="font-size: 3rem;"></i>
+                <h3>Xác nhận xóa?</h3>
+                @* Chuẩn hóa ID các span *@
+                <div class="text-muted">Bạn có chắc chắn muốn xóa phòng ban <strong id="modalItemName"></strong> (Mã: <strong id="modalItemId"></strong>)? Hành động này không thể hoàn tác.</div>
+
+                @* <div class="text-muted">Bạn có chắc chắn muốn xóa phòng ban <strong id="phongBanNameToDelete"></strong> (Mã: <strong id="phongBanIdToDelete"></strong>)? Hành động này không thể hoàn tác.</div> *@
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <a href="#" class="btn w-100" data-bs-dismiss="modal">
+                                Hủy bỏ
+                            </a>
+                        </div>
+                        <div class="col">
+                            <button type="button" id="confirmDeleteButton" class="btn btn-danger w-100">
+                                Xác nhận Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@* --- HẾT HTML CHO MODAL --- *@
+
+@section Scripts {
+    <partial name="_CoreValidationScriptsPartial" />
+    @* Tham chiếu JS DataTables nếu cần *@
+
+    <script>
+        const antiForgeryToken = '@requestToken'; // Giữ nguyên dòng này
+        //console.log('DEBUG: AntiForgeryToken value:', antiForgeryToken); // <-- Thêm log kiểm tra token
+
+        $(document).ready(function () {
+            // 1. Khởi tạo DataTables
+            var phongBanDataTable = $('#phongBanTable').DataTable({ // Lưu vào biến
+                //language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/vi.json' },
+                //fixedHeader: true,
+                pageLength: 10,
+                lengthMenu: [ [10, 25, 50, -1], [10, 25, 50, "Tất cả"] ],
+                order: [[0, 'asc']], // Sắp xếp theo cột Mã phòng (index = 0)
+                columnDefs: [
+                    { targets: 5, orderable: false } // Cột Hành động (index 5) không sắp xếp
+                 ],
+                 headerCallback: function(thead, data, start, end, display) {
+                    // Duyệt qua từng phần tử <th> và thêm lớp CSS mà không ảnh hưởng tới các ID hoặc thuộc tính mặc định của <thead>
+                    $(thead).find('th').each(function() {
+                        $(this).addClass('bg-primary-lt text-center text-muted');
+                    });
+                }
+            });
+
+            //console.log('DEBUG: phongBanDataTable instance after init:', phongBanDataTable); // <-- Thêm log kiểm tra DataTable
+
+            // 2. Gọi hàm khởi tạo modal xóa dùng chung từ site.modal-delete.js
+            //console.log('DEBUG: Calling initializeDeleteModal for PhongBan...'); // <-- Giữ log này
+            initializeDeleteModal({
+                modalId: '#deleteConfirmModal',              // ID của modal HTML
+                triggerButtonSelector: '.delete-confirmation-button', // Class của các nút xóa
+                confirmButtonId: 'confirmDeleteButton',          // ID của nút xác nhận trong modal (bỏ dấu #)
+                nameElementSelector: '#modalItemName',          // ID span hiển thị tên trong modal
+                idElementSelector: '#modalItemId',            // ID span hiển thị ID trong modal
+                dataIdAttribute: 'data-id',                 // Thuộc tính data-* chứa ID (MaPhong) trên nút xóa
+                dataNameAttribute: 'data-name',               // Thuộc tính data-* chứa Tên trên nút xóa
+                deleteUrlTemplate: '@Url.Action("Delete", "PhongBan")/{id}',   // Mẫu URL xóa (placeholder {id} sẽ được thay bằng MaPhong)
+                dataTableInstance: phongBanDataTable,          // Instance của DataTables
+                antiForgeryToken: '@requestToken',            // Token chống giả mạo
+                entityName: 'phòng ban'                     // Tên gọi đối tượng để hiển thị thông báo
+            });
+
+        });
+    </script>
+}

@@ -1,0 +1,272 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+/*Bổ sung*/
+.form-group {
+    margin-bottom: 15px; /* Tăng khoảng cách giữa các nhóm input */
+}
+
+label {
+    font-weight: bold;
+}
+
+.required-label::after {
+    content: " *";
+    color: red;
+    font-weight: bold;
+}
+
+/* Styles for document mapping */
+#document-preview {
+    min-height: 500px;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    position: relative;
+    transition: all 0.2s ease-in-out;
+
+}
+
+#document-preview.drag-over {
+    border-color: #206bc4;
+    background-color: rgba(32, 107, 196, 0.05);
+    box-shadow: 0 0 0 0.25rem rgba(32, 107, 196, 0.25);
+}
+
+.field-placeholder {
+    display: inline-block;
+    background-color: #e9ecef;
+    color: #206bc4;
+    border: 1px solid #a5d8ff;
+    border-radius: 4px;
+    padding: 0 4px;
+    margin: 0 2px;
+    font-weight: 500;
+    white-space: nowrap;
+    position: relative;
+    cursor: move;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.field-placeholder:hover {
+    background-color: #d0ebff;
+    box-shadow: 0 0 0 1px #a5d8ff;
+}
+
+.field-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    border-radius: 50%;
+    background-color: #ff6b6b;
+    color: white;
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.field-placeholder:hover .field-delete {
+    opacity: 1;
+}
+
+.field-delete:hover {
+    background-color: #ff5252;
+}
+
+/* Field list styles */
+.field-item {
+    padding: 8px 12px;
+    /*margin: 4px 0;*/
+    /*border: 1px solid #dee2e6;*/
+    border-radius: 4px;
+    background-color: white;
+    /*cursor: grab;*/
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.field-item:hover {
+    background-color: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.field-item.dragging {
+    opacity: 0.5;
+    background-color: #e9ecef;
+    border-style: dashed;
+}
+
+.field-item .badge {
+    font-size: 0.7em;
+    margin-top: 2px;
+}
+
+/* Cursor indicator */
+#cursor-indicator {
+    position: absolute;
+    width: 2px;
+    height: 24px;
+    background-color: #206bc4;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.8;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 0.3; }
+}
+
+/* Responsive layout */
+@media (max-width: 992px) {
+    #document-preview {
+        min-height: 300px;
+    }
+}
+
+:root {
+    color-scheme: light dark;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared styles for Form pages (Create / Edit / Details)                     */
+/* -------------------------------------------------------------------------- */
+
+.highlighted-merge {
+    background-color: #d1e7dd;
+    color: #0f5132;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+/* Light background alerts (Tabler) */
+.bg-success-lt {
+    background-color: #d1e7dd !important;
+    color: #0f5132 !important;
+}
+
+.bg-yellow-lt {
+    background-color: #fff3cd !important;
+    color: #664d03 !important;
+}
+
+/* Docx preview & placeholder styles */
+#preview-pane-body {
+    overflow: hidden;
+    position: relative;
+}
+
+#docxPreviewWrapper {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#docxPreview .docx *,
+#mergePreviewBody .docx * {
+    font-family: "Times New Roman", Times, serif !important;
+}
+
+.docx-wrapper {
+    padding-top: 0 !important;
+    background-color: white !important;
+}
+
+#docxPreview .docx-wrapper {
+    max-width: 100%;
+    transform-origin: top center;
+}
+
+.placeholder-span {
+    padding: 1px 3px;
+    border-radius: 3px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    font-style: inherit !important;
+    color: inherit !important;
+    line-height: inherit !important;
+}
+
+.placeholder-empty {
+    background-color: #fff3cd;
+    border: 1px dotted #ffe69c;
+}
+
+.placeholder-filled {
+    background-color: #d1e7dd;
+    color: #0f5132 !important;
+}
+
+.missing-fields-list {
+    list-style-type: '- ';
+    color: #d63939;
+    text-align: left;
+    padding-left: 2rem;
+    font-weight: 500;
+}
+
+/* Fieldset block for basic info / details columns */
+.form-fieldset {
+    border: 1px solid #e9ecf1;
+    border-radius: 4px;
+    padding: 1rem;
+}
+
+.form-fieldset legend {
+    padding: 0 .5rem;
+    width: auto;
+    font-size: .875rem;
+    font-weight: 600;
+    color: #597e8d;
+}
+
+/* ---------------------------- */
+/* -- STYLE CHO DATATABLE -- */
+/* Áp dụng cho các bảng DataTables để đảm bảo layout ổn định */
+.table-datatable {
+    table-layout: fixed;
+    width: 100% !important;
+}
+
+/* Thay đổi con trỏ chuột khi di vào nội dung bị cắt ngắn */
+.cursor-help {
+    cursor: help;
+}
+
+/* Tùy chỉnh độ rộng tối đa của tooltip */
+.tooltip-wide .tooltip-inner {
+    max-width: 600px; /* Bạn có thể thay đổi giá trị này */
+    text-align: left;
+}
+/* -- END STYLE CHO DATATABLE -- */
+/* ---------------------------- */

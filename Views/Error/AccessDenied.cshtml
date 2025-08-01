@@ -1,0 +1,32 @@
+@{
+    ViewData["Title"] = "Truy cập bị từ chối";
+    Layout = "_Layout";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h1 class="display-4"><i class="fas fa-exclamation-triangle"></i> Lỗi 403</h1>
+                </div>
+                <div class="card-body">
+                    <h2 class="text-danger">Truy cập bị từ chối</h2>
+                    <p class="lead">
+                        Rất tiếc, bạn không có quyền truy cập vào tài nguyên này.
+                    </p>
+                    <hr>
+                    <p>
+                        Nếu bạn tin rằng đây là lỗi, vui lòng liên hệ với quản trị viên để được hỗ trợ.
+                    </p>
+                    <a href="/" class="btn btn-primary mt-3">
+                        <i class="fas fa-home"></i> Quay về trang chủ
+                    </a>
+                    <a href="javascript:history.back()" class="btn btn-outline-secondary mt-3">
+                        <i class="fas fa-arrow-left"></i> Quay lại trang trước
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

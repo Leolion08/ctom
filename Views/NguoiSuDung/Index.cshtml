@@ -1,0 +1,305 @@
+@model IEnumerable<CTOM.ViewModels.UserIndexViewModel>
+@* Inject Antiforgery vẫn có thể cần nếu có các form khác trên trang hoặc để chuẩn bị cho các chức năng tương lai *@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+
+@{
+    ViewData["Title"] = "Danh sách Người dùng";
+    var requestToken = Xsrf.GetAndStoreTokens(Context).RequestToken; // Vẫn lấy token nếu cần cho các form khác
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title text-uppercase">@ViewData["Title"]</h3>
+        <div class="card-actions">
+            <a asp-action="Create" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>
+                Thêm người dùng mới
+            </a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        @* Áp dụng các class table đã thống nhất *@
+        <table id="nguoiDungTable" class="table table-hover table-bordered align-middle card-table table-vcenter text-nowrap text-center datatable">
+            <thead>
+                <tr>
+                    @* Header được style bằng headerCallback trong JS *@
+                    <th>Tên truy cập</th>
+                    <th>Họ và Tên</th>
+                    <th>Tên Phòng</th>
+                    <th>Nhóm quyền</th>
+                    <th>Trạng Thái</th>
+                    <th data-orderable="false">&nbsp;</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr id="row-@item.Id">
+                        @* Dùng Id GUID cho ID của dòng *@
+                        <td>@item.UserName</td>
+                        <td class="text-start">@item.TenUser</td>
+                        <td class="text-start">@item.TenPhong</td>
+                        <td>
+                            @string.Join(", ", item.Roles)
+                        </td>
+                        <td>
+                            @* Sử dụng badge style đã thống nhất *@
+                            @if (item.TrangThai == "A")
+                            {
+                                <span class="badge bg-success-subtle">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger-subtle">Disabled</span>
+                            }
+                        </td>
+
+                        <td>
+                            <div class="btn-list flex-nowrap w-100 d-flex justify-content-center">
+                                @* Sử dụng Id (GUID) trong route *@
+                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-outline-info">Chi tiết</a>&nbsp;
+                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-outline-yellow">Sửa</a>&nbsp;
+
+                                <button type="button" class="btn btn-sm btn-outline-warning reset-password-button"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#resetPasswordModal"
+                                        data-userid="@item.Id"
+                                        data-username="@item.UserName"
+                                        title="Reset mật khẩu">
+                                    Reset mật khẩu
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@* === HTML CHO MODAL RESET MẬT KHẨU === *@
+<div class="modal modal-blur fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form id="resetPasswordForm" method="post" autocomplete="off">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="resetUserId" name="UserId" />
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="resetPasswordModalLabel">Reset Mật khẩu cho: <span id="resetUserName" class="fw-bold"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="resetPasswordErrorPlaceholder" class="text-danger mb-3"></div>
+                    <div class="mb-3">
+                        <label for="resetNewPassword" class="form-label required">Mật khẩu mới</label>
+                        <input type="password" id="resetNewPassword" name="NewPassword" class="form-control" autocomplete="new-password" required minlength="6" placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)">
+                        <div class="invalid-feedback">Mật khẩu mới là bắt buộc và ít nhất 6 ký tự.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="resetConfirmPassword" class="form-label required">Xác nhận mật khẩu mới</label>
+                        <input type="password" id="resetConfirmPassword" name="ConfirmPassword" class="form-control" required placeholder="Nhập lại mật khẩu mới">
+                        <div class="invalid-feedback">Vui lòng nhập lại mật khẩu xác nhận.</div>
+                        <div id="resetPasswordMismatchError" class="text-danger mt-1" style="display: none;">Mật khẩu xác nhận không khớp.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" id="confirmResetPasswordButton" class="btn btn-warning">Xác nhận Reset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@* === HẾT HTML CHO MODAL RESET MẬT KHẨU === *@
+
+@section Scripts {
+    <partial name="_CoreValidationScriptsPartial" />
+    @* Tham chiếu JS DataTables nếu cần *@
+
+    <script>
+        $(document).ready(function () {
+            // 1. Khởi tạo DataTables (giữ nguyên)
+            var nguoiDungDataTable = $('#nguoiDungTable').DataTable({
+                 //language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/vi.json' },
+                 pageLength: 10,
+                 lengthMenu: [ [10, 25, 50, -1], [10, 25, 50, "Tất cả"] ],
+                 order: [[0, 'asc']],
+                 columnDefs: [ { targets: 5, orderable: false } ],
+                 headerCallback: function(thead, data, start, end, display) {
+                    $(thead).find('th').each(function() {
+                        $(this).addClass('bg-primary-lt text-center text-muted');
+                    });
+                 }
+             });
+
+            // === XỬ LÝ MODAL RESET PASSWORD ===
+            const resetPasswordModalElement = document.getElementById('resetPasswordModal');
+            const resetPasswordForm = document.getElementById('resetPasswordForm');
+            const resetUserIdInput = document.getElementById('resetUserId');
+            const resetUserNameSpan = document.getElementById('resetUserName');
+            const newPasswordInput = document.getElementById('resetNewPassword');
+            const confirmPasswordInput = document.getElementById('resetConfirmPassword');
+            const passwordMismatchError = document.getElementById('resetPasswordMismatchError');
+            const resetErrorPlaceholder = document.getElementById('resetPasswordErrorPlaceholder');
+            const resetPasswordModalInstance = bootstrap.Modal.getOrCreateInstance(resetPasswordModalElement);
+            const resetPasswordSubmitButton = document.getElementById('confirmResetPasswordButton');
+
+            if (resetPasswordModalElement) {
+                // Sự kiện trước khi modal hiển thị
+                resetPasswordModalElement.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const userId = button.getAttribute('data-userid');
+                    const userName = button.getAttribute('data-username');
+
+                    resetUserIdInput.value = userId || '';
+                    resetUserNameSpan.textContent = userName || '';
+
+                    resetPasswordForm.reset();
+                    resetErrorPlaceholder.innerHTML = '';
+                    passwordMismatchError.style.display = 'none';
+                    $(newPasswordInput).removeClass('is-invalid');
+                    $(confirmPasswordInput).removeClass('is-invalid');
+                    resetPasswordSubmitButton.disabled = false;
+                });
+
+                 // Dọn dẹp backdrop khi modal ẩn
+                 resetPasswordModalElement.addEventListener('hidden.bs.modal', function() {
+                     // Gọi hàm cleanup từ site.js (nếu đã định nghĩa ở đó)
+                     if (typeof cleanupModalBackdrop === 'function') {
+                         cleanupModalBackdrop();
+                     } else { // Fallback nếu hàm chưa có trong site.js
+                          const backdrop = document.querySelector('.modal-backdrop');
+                          if (backdrop) backdrop.remove();
+                          document.body.classList.remove('modal-open');
+                          document.body.style.overflow = '';
+                          document.body.style.paddingRight = '';
+                     }
+                 });
+            }
+
+            // Sự kiện submit form reset password
+            if (resetPasswordForm) {
+                resetPasswordForm.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    resetErrorPlaceholder.innerHTML = '';
+                    passwordMismatchError.style.display = 'none';
+                    $(newPasswordInput).removeClass('is-invalid');
+                    $(confirmPasswordInput).removeClass('is-invalid');
+
+                    // Client-side validation
+                    let isValid = true;
+                    if (!newPasswordInput.value || newPasswordInput.value.length < 6) {
+                         $(newPasswordInput).addClass('is-invalid'); isValid = false;
+                    }
+                     if (!confirmPasswordInput.value) {
+                         $(confirmPasswordInput).addClass('is-invalid'); isValid = false;
+                    }
+                    if (isValid && newPasswordInput.value !== confirmPasswordInput.value) {
+                        passwordMismatchError.style.display = 'block';
+                        $(confirmPasswordInput).addClass('is-invalid'); isValid = false;
+                    }
+                    if (!isValid) return;
+
+                    // Disable nút submit
+                    resetPasswordSubmitButton.disabled = true;
+                    resetPasswordSubmitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang xử lý...';
+
+                    const formData = new FormData();
+                    formData.append('id', resetUserIdInput.value);
+                    formData.append('newPassword', newPasswordInput.value);
+                    formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+
+                    //const url = '/NguoiSuDung/ResetPassword';
+                    const url = '@Url.Action("ResetPassword", "NguoiSuDung")';
+
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    })
+                    .then(async response => {
+                        const isJson = response.headers.get('content-type')?.includes('application/json');
+                        const responseData = isJson ? await response.json() : await response.text();
+                        if (!response.ok) {
+                             const error = (responseData && responseData.message) || responseData || `Lỗi HTTP! status: ${response.status}`;
+                             throw new Error(error);
+                        }
+                        return responseData;
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            resetPasswordModalInstance.hide();
+                            // Gọi hàm thông báo từ site.js (nếu đã định nghĩa)
+                            if(typeof showAppNotification === 'function') {
+                                showAppNotification(data.message || 'Reset mật khẩu thành công!', 'success');
+                            } else {
+                                alert(data.message || 'Reset mật khẩu thành công!'); // Fallback
+                            }
+                        } else {
+                            let errorHtml = '<ul>';
+                            if(data.errors && Array.isArray(data.errors)) { data.errors.forEach(err => { errorHtml += `<li>${err}</li>`; }); }
+                            else if (data.message) { errorHtml += `<li>${data.message}</li>`; }
+                            else { errorHtml += `<li>Lỗi không xác định.</li>`; }
+                             errorHtml += '</ul>';
+                             resetErrorPlaceholder.innerHTML = errorHtml;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Fetch Error:', error);
+                        resetErrorPlaceholder.innerHTML = `<ul><li>Lỗi xử lý yêu cầu: ${error.message}</li></ul>`;
+                    })
+                    .finally(() => {
+                         resetPasswordSubmitButton.disabled = false;
+                         resetPasswordSubmitButton.innerHTML = 'Xác nhận Reset';
+                    });
+                });
+            }
+
+             // --- BẮT ĐẦU: ĐOẠN CODE KIỂM TRA KHỚP MẬT KHẨU KHI GÕ ---
+
+            // Kiểm tra khớp mật khẩu khi người dùng gõ vào ô Xác nhận mật khẩu
+             if(confirmPasswordInput && newPasswordInput) {
+                 confirmPasswordInput.addEventListener('input', function() {
+                     if (newPasswordInput.value !== confirmPasswordInput.value) {
+                         // Đặt thông báo lỗi tùy chỉnh cho validation HTML5 (nếu trình duyệt hỗ trợ)
+                         confirmPasswordInput.setCustomValidity("Mật khẩu xác nhận không khớp.");
+                         // Hiển thị thông báo lỗi trực quan
+                         passwordMismatchError.style.display = 'block';
+                         // Thêm class invalid của Bootstrap/Tabler
+                         $(confirmPasswordInput).addClass('is-invalid');
+                     } else {
+                         // Xóa thông báo lỗi tùy chỉnh
+                         confirmPasswordInput.setCustomValidity("");
+                         // Ẩn thông báo lỗi trực quan
+                         passwordMismatchError.style.display = 'none';
+                         // Xóa class invalid
+                          $(confirmPasswordInput).removeClass('is-invalid');
+                     }
+                 });
+
+                 // Thêm: Kiểm tra lại ô Xác nhận khi ô Mật khẩu mới thay đổi
+                  newPasswordInput.addEventListener('input', function() {
+                      // Trigger sự kiện input trên ô confirm để nó tự kiểm tra lại
+                      const event = new Event('input', { bubbles: true, cancelable: true });
+                      confirmPasswordInput.dispatchEvent(event);
+
+                      // Đồng thời kiểm tra độ dài tối thiểu cho mật khẩu mới
+                       if (newPasswordInput.value.length < 6) {
+                           newPasswordInput.setCustomValidity("Mật khẩu phải có ít nhất 6 ký tự.");
+                           $(newPasswordInput).addClass('is-invalid');
+                      } else {
+                           newPasswordInput.setCustomValidity("");
+                           $(newPasswordInput).removeClass('is-invalid');
+                      }
+                  });
+             }
+
+            // --- KẾT THÚC: ĐOẠN CODE KIỂM TRA KHỚP MẬT KHẨU KHI GÕ ---
+
+        });
+    </script>
+}

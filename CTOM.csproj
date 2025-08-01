@@ -1,0 +1,159 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>aspnet-CTOM-000c4be2-468d-4cbf-b79d-dc0feacd3dda</UserSecretsId>
+
+    <!-- Cấu hình tài nguyên mặc định -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <SatelliteResourceLanguages>en;vi</SatelliteResourceLanguages>
+    <NoWarn>$(NoWarn);NU5105</NoWarn>
+
+    <!-- Cấu hình publish -->
+    <SelfContained>false</SelfContained> <!-- ✅ CHỈNH SỬA -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <TrimMode>link</TrimMode>
+    <TrimmerRemoveSymbols>false</TrimmerRemoveSymbols>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <PublishIISAssets>true</PublishIISAssets>
+  </PropertyGroup>
+
+  <!-- Bật tự động thêm Content mặc định -->
+  <!--
+    + json, config, xml, resx, dll ngoại vi (nếu dùng ref), cshtml
+    + wwwroot/**/* (Static files: ảnh, js, css,...),
+    + Views/**/*
+   -->
+  <PropertyGroup>
+    <EnableDefaultContentItems>true</EnableDefaultContentItems>
+  </PropertyGroup>
+
+  <!-- Cấu hình các file tĩnh (được xử lý tự động khi EnableDefaultContentItems=true) -->
+  <!--
+  <ItemGroup>
+    <Content Include="wwwroot\**">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Folder Include="wwwroot\lib\tabler\" />
+  </ItemGroup>
+  -->
+
+  <!-- Cấu hình các file Razor Views (được xử lý tự động khi EnableDefaultContentItems=true) -->
+  <!--
+  <ItemGroup>
+    <Content Include="Views\**\*.cshtml">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+  -->
+
+  <ItemGroup>
+    <!-- Copy SQL scripts to publish directory -->
+    <Content Include="Data\Scripts\**\*.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Copy SeedData JSON files (được xử lý tự động khi EnableDefaultContentItems=true) -->
+  <!--
+  <ItemGroup>
+    <Content Include="Data\SeedData\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  -->
+
+  <!-- Cấu hình các file appsettings (được xử lý tự động khi EnableDefaultContentItems=true) -->
+  <!--
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="appsettings.Production.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Remove="appsettings.Development.json" />
+  </ItemGroup>
+  -->
+
+  <!-- Cấu hình file cấu hình import Excel (được xử lý tự động khi EnableDefaultContentItems=true) -->
+  <!--
+  <ItemGroup>
+    <Content Include="Configurations\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  -->
+
+  <!-- Loại bỏ các file không cần thiết khỏi thư mục publish (dạng ile nội dung (Content))-->
+  <ItemGroup>
+    <Content Update="appsettings.Development.json">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Loại bỏ file không cần thiết (dạng file mã nguồn/tài nguyên)-->
+  <ItemGroup>
+    <Compile Remove="wwwroot\lib\bootstrap\scss\**" />
+    <EmbeddedResource Remove="wwwroot\lib\bootstrap\scss\**" />
+    <None Remove="wwwroot\lib\bootstrap\scss\**" />
+  </ItemGroup>
+
+  <!-- Tạo thư mục rỗng TemplatesData khi publish -->
+  <Target Name="CreateTemplatesDataFolder" AfterTargets="Publish">
+    <MakeDir Directories="$(PublishDir)TemplatesData" />
+  </Target>
+
+  <!-- Tạo thư mục rỗng Keys khi publish
+  chứa keys để giải quyết vấn đề mất session/login khi IIS App Pool recycle
+  -->
+  <Target Name="CreateKeysFolder" AfterTargets="Publish">
+    <MakeDir Directories="$(PublishDir)Keys" />
+  </Target>
+
+  <!-- Bảo toàn các assembly cần thiết khi trimming -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Microsoft.AspNetCore" />
+    <TrimmerRootAssembly Include="Microsoft.AspNetCore.Mvc.Razor" />
+    <TrimmerRootAssembly Include="Microsoft.AspNetCore.Mvc.RazorPages" />
+    <TrimmerRootAssembly Include="Microsoft.AspNetCore.Mvc.TagHelpers" />
+    <TrimmerRootAssembly Include="Microsoft.Extensions.Logging" />
+    <TrimmerRootAssembly Include="System.Text.Json" />
+  </ItemGroup>
+
+  <!-- Các package sử dụng -->
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <PackageReference Include="ExcelDataReader" Version="3.7.0" />
+    <PackageReference Include="ExcelDataReader.DataSet" Version="3.7.0" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.Localization" Version="2.3.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.14">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.14">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="LigerShark.WebOptimizer.Core" Version="3.0.348" />
+    <PackageReference Include="LigerShark.WebOptimizer.Sass" Version="3.0.84" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.5" />
+  </ItemGroup>
+
+</Project>

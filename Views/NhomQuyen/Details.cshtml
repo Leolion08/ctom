@@ -1,0 +1,67 @@
+﻿@model CTOM.Models.Entities.ApplicationRole
+
+@{
+    ViewData["Title"] = "Chi tiết Nhóm quyền";
+}
+
+<div class="container mt-4">
+    <div class="card col-md-6 mx-auto">
+        @* Layout tương tự Edit/Create *@
+        <div class="card-header bg-info text-white">
+            @* Màu header khác *@
+            <h3 class="card-title fw-bold">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-description me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 17h6" /><path d="M9 13h6" /></svg>
+                @ViewData["Title"]: @Model.Name
+            </h3>
+        </div>
+        <div class="card-body">
+            @* Sử dụng definition list (dl) để hiển thị thông tin *@
+            <dl class="row">
+                <dt class="col-sm-4 text-end">ID</dt>
+                <dd class="col-sm-8 ">@Html.DisplayFor(model => model.Id)</dd>
+
+                <dt class="col-sm-4 text-end">Mã nhóm quyền</dt>
+                <dd class="col-sm-8 ">@Html.DisplayFor(model => model.Name)</dd>
+
+                <dt class="col-sm-4 text-end">Tên nhóm quyền</dt>
+                <dd class="col-sm-8 ">@Html.DisplayFor(model => model.TenNhomDayDu)</dd>
+
+                <dt class="col-sm-4 text-end">Trạng thái</dt>
+                <dd class="col-sm-8 ">
+                    @if (Model.TrangThai == "A")
+                    {
+                        <span class="badge bg-success-lt">Active</span> @* Dùng badge cho đẹp *@
+                    }
+                    else if (Model.TrangThai == "D")
+                    {
+                        <span class="badge bg-danger-lt">Disabled</span>
+                    }
+                    else
+                    {
+                        @Html.DisplayFor(model => model.TrangThai)
+                    }
+                </dd>
+
+                @* <dt class="col-sm-4">Normalized Name</dt>
+                <dd class="col-sm-8">@Html.DisplayFor(model => model.NormalizedName)</dd>
+
+                <dt class="col-sm-4">Concurrency Stamp</dt>
+                <dd class="col-sm-8">@Html.DisplayFor(model => model.ConcurrencyStamp)</dd> *@
+            </dl>
+        </div>
+        <div class="card-footer mt-4 d-flex">
+            @* Đặt nút ở footer card *@
+            @* <a asp-action="Edit" asp-route-roleName="@Model.Name" class="btn btn-primary">Chỉnh sửa</a>
+            <a asp-action="Index" class="btn btn-outline-secondary">Quay lại danh sách</a> *@
+            <a asp-action="Edit" asp-route-roleName="@Model.Name" class="btn btn-yellow">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-edit me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" /><path d="M16 5l3 3" /></svg>
+                Chỉnh sửa
+                </a>
+            <a asp-action="Index" class="btn btn-outline-secondary ms-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-back-up me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9 14l-4 -4l4 -4" /><path d="M5 10h11a4 4 0 1 1 0 8h-1" /></svg>
+                Quay lại danh sách
+                </a>
+        </div> 
+
+    </div>
+</div>

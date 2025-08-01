@@ -1,0 +1,77 @@
+@model CTOM.ViewModels.PhongBan.CreatePhongBanViewModel
+
+@{
+    ViewData["Title"] = "Thêm phòng mới";
+}
+<div class="container mt-4">
+    <div class="card col-md-6 mx-auto">
+        @* <div class="card-header bg-secondary text-white">
+            <h3 class="card-title fw-bold">
+                 <i class="ti ti-building mr-2"></i> Thêm mới phòng ban                
+            </h3>
+        </div> *@
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title fw-bold mb-0">
+                @* <i class="ti ti-plus me-2"></i>  *@
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-building-plus me-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 21h9" /><path d="M9 8h1" /><path d="M9 12h1" /><path d="M9 16h1" /><path d="M14 8h1" /><path d="M14 12h1" /><path d="M5 21v-16c0 -.53 .211 -1.039 .586 -1.414c.375 -.375 .884 -.586 1.414 -.586h10c.53 0 1.039 .211 1.414 .586c.375 .375 .586 .884 .586 1.414v7" /><path d="M16 19h6" /><path d="M19 16v6" /></svg>
+                 Thêm phòng mới
+            </h3>
+        </div>
+        <div class="card-body">
+            <form asp-action="Create">
+                <!-- Mã phòng -->
+                <div class="form-group">
+                    <label asp-for="MaPhong" class="form-label required">Mã phòng</label>
+                    <input asp-for="MaPhong" class="form-control" />
+                    <span asp-validation-for="MaPhong" class="text-danger"></span>
+                </div>
+
+                <!-- Mã phòng HR -->
+                <div class="form-group">
+                    <label asp-for="MaPhongHR" class="form-label">Mã phòng HR</label>
+                    <input asp-for="MaPhongHR" class="form-control" />
+                </div>
+
+                <!-- Tên phòng -->
+                <div class="form-group">
+                    <label asp-for="TenPhong" class="form-label required">Tên phòng</label>
+                    <input asp-for="TenPhong" class="form-control" />
+                    <span asp-validation-for="TenPhong" class="text-danger"></span>
+                </div>
+
+                <!-- Tên viết tắt -->
+                <div class="form-group">
+                    <label asp-for="TenVietTat" class="form-label">Tên viết tắt</label>
+                    <input asp-for="TenVietTat" class="form-control" />
+                </div>
+
+                <!-- Trạng thái -->
+                <div class="form-group">
+                    <label asp-for="TrangThai" class="form-label">Trạng thái</label>
+                    <select asp-for="TrangThai" class="form-select">
+                        <option value="A">Active</option>
+                        <option value="D">Disabled</option>
+                    </select>
+                </div>
+
+                @* d-flex → Dùng flexbox để kiểm soát vị trí của các nút.
+                ms-auto → Tự động đẩy nút "Quay lại danh sách" về bên phải.
+                float-end → Đảm bảo nút này bám sát lề phải khi cần. *@
+                <div class="mt-4 d-flex"> 
+                    <button type="submit" class="btn btn-primary shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-floppy me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>
+                        Lưu thông tin
+                        </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary ms-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-back-up me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9 14l-4 -4l4 -4" /><path d="M5 10h11a4 4 0 1 1 0 8h-1" /></svg>
+                        Quay lại danh sách
+                        </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_CoreValidationScriptsPartial" />
+}

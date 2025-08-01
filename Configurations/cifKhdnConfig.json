@@ -1,0 +1,192 @@
+{
+  "maxRows": 100,
+  "maxFileSizeMB": 1,
+  "fields": {
+    "SoCif": {
+      "field": "SoCif",
+      "label": "Số CIF",
+      "required": true,
+      "maxLength": 50
+    },
+    "TenCif": {
+	  "field": "TenCif",
+      "label": "Tên khách hàng",
+      "required": true,
+      "maxLength": 255
+    },
+    "XepHangTinDungNoiBo": {
+      "field": "XepHangTinDungNoiBo",
+      "label": "Xếp hạng tín dụng nội bộ"
+    },
+    "LoaiHinhDN": {
+      "field": "LoaiHinhDN",
+      "label": "Loại hình doanh nghiệp"
+    },
+    "SoGiayChungNhanDKKD": {
+      "field": "SoGiayChungNhanDKKD",
+      "label": "Số Giấy chứng nhận ĐKKD",
+      "maxLength": 100
+    },
+    "NoiCapGiayChungNhanDKKD": {
+      "field": "NoiCapGiayChungNhanDKKD",
+      "label": "Nơi cấp Giấy chứng nhận ĐKKD"
+    },
+    "NgayCapGiayChungNhanDKKD": {
+      "field": "NgayCapGiayChungNhanDKKD",
+      "label": "Ngày cấp Giấy chứng nhận ĐKKD",
+      "type": "date",
+      "format": "dd/MM/yyyy"
+    },
+    "TenTiengAnh": {
+      "field": "TenTiengAnh",
+      "label": "Tên tiếng Anh"
+    },
+    "DiaChiTrenDKKD": {
+      "field": "DiaChiTrenDKKD",
+      "label": "Địa chỉ trên ĐKKD"
+    },
+    "DiaChiKinhDoanhHienTai": {
+      "field": "DiaChiKinhDoanhHienTai",
+      "label": "Địa chỉ kinh doanh hiện tại"
+    },
+    "LinhVucKinhDoanhChinh": {
+      "field": "LinhVucKinhDoanhChinh",
+      "label": "Lĩnh vực kinh doanh chính"
+    },
+    "SoDienThoaiDN": {
+      "field": "SoDienThoaiDN",
+      "label": "Số điện thoại doanh nghiệp",
+      "maxLength": 20
+    },
+    "SoFaxCongTy": {
+      "field": "SoFaxCongTy",
+      "label": "Số Fax Công ty"
+    },
+    "EmailCongTy": {
+      "field": "EmailCongTy",
+      "label": "Email Công ty",
+      "type": "email",
+      "maxLength": 100
+    },
+    "TenNguoiDaiDienTheoPhapLuat": {
+      "field": "TenNguoiDaiDienTheoPhapLuat",
+      "label": "Tên Người đại diện theo pháp luật",
+      "maxLength": 255
+    },
+    "ChucVu": {
+      "field": "ChucVu",
+      "label": "Chức vụ",
+      "maxLength": 100
+    },
+    "NgaySinhDaiDienCongTy": {
+      "field": "NgaySinhDaiDienCongTy",
+      "label": "Ngày sinh đại diện Công ty",
+      "type": "date",
+      "format": "dd/MM/yyyy"
+    },
+    "GioiTinhDaiDienCongTy": {
+      "field": "GioiTinhDaiDienCongTy",
+      "label": "Giới tính đại diện Công ty"
+    },
+    "QuocTichDaiDienCongTy": {
+      "field": "QuocTichDaiDienCongTy",
+      "label": "Quốc tịch đại diện Công ty"
+    },
+    "SoGiayToTuyThanDaiDienCongTy": {
+      "field": "SoGiayToTuyThanDaiDienCongTy",
+      "label": "Số giấy tờ tùy thân đại diện Công ty"
+    },
+    "NgayCapGiayToTuyThanDaiDienDN": {
+      "field": "NgayCapGiayToTuyThanDaiDienDN",
+      "label": "Ngày cấp giấy tờ tùy thân đại diện DN",
+      "type": "date",
+      "format": "dd/MM/yyyy"
+    },
+    "NoiCapGiayToTuyThanDaiDienDN": {
+      "field": "NoiCapGiayToTuyThanDaiDienDN",
+      "label": "Nơi cấp giấy tờ tùy thân đại diện DN"
+    },
+    "NgayHetHanGiayToTuyThanDaiDienDN": {
+      "field": "NgayHetHanGiayToTuyThanDaiDienDN",
+      "label": "Ngày hết hạn giấy tờ tùy thân đại diện DN",
+      "type": "date",
+      "format": "dd/MM/yyyy"
+    },
+    "DiaChiDaiDienCongTy": {
+      "field": "DiaChiDaiDienCongTy",
+      "label": "Địa chỉ đại diện Công ty"
+    },
+    "SoDienThoaiDaiDienCongTy": {
+      "field": "SoDienThoaiDaiDienCongTy",
+      "label": "Số điện thoại đại diện Công ty",
+      "maxLength": 20
+    },
+    "EmailDaiDienCongTy": {
+      "field": "EmailDaiDienCongTy",
+      "label": "Email đại diện Công ty",
+      "type": "email",
+      "maxLength": 100
+    },
+    "VanBanUyQuyenSo": {
+      "field": "VanBanUyQuyenSo",
+      "label": "Văn bản ủy quyền số"
+    },
+    "TenKeToanTruong": {
+      "field": "TenKeToanTruong",
+      "label": "Tên Kế toán trưởng"
+    },
+    "ChucVuKeToanTruong": {
+      "field": "ChucVuKeToanTruong",
+      "label": "Chức vụ Kế toán trưởng"
+    },
+    "NgaySinhKeToanTruong": {
+      "field": "NgaySinhKeToanTruong",
+      "label": "Ngày sinh Kế toán trưởng",
+      "type": "date",
+      "format": "dd/MM/yyyy"
+    },
+    "GioiTinhKeToanTruong": {
+      "field": "GioiTinhKeToanTruong",
+      "label": "Giới tính Kế toán trưởng"
+    },
+    "QuocTichKeToanTruong": {
+      "field": "QuocTichKeToanTruong",
+      "label": "Quốc tịch Kế toán trưởng"
+    },
+    "SoGiayToTuyThanKeToanTruong": {
+      "field": "SoGiayToTuyThanKeToanTruong",
+      "label": "Số giấy tờ tùy thân Kế toán trưởng"
+    },
+    "NgayCapGiayToTuyThanKeToanTruong": {
+      "field": "NgayCapGiayToTuyThanKeToanTruong",
+      "label": "Ngày cấp giấy tờ tùy thân Kế toán trưởng",
+      "type": "date",
+      "format": "dd/MM/yyyy"
+    },
+    "NoiCapGiayToTuyThanKeToanTruong": {
+      "field": "NoiCapGiayToTuyThanKeToanTruong",
+      "label": "Nơi cấp giấy tờ tùy thân Kế toán trưởng"
+    },
+    "NgayHetHanGiayToTuyThanKeToanTruong": {
+      "field": "NgayHetHanGiayToTuyThanKeToanTruong",
+      "label": "Ngày hết hạn giấy tờ tùy thân Kế toán trưởng",
+      "type": "date",
+      "format": "dd/MM/yyyy"
+    },
+    "SoDienThoaiKeToanTruong": {
+      "field": "SoDienThoaiKeToanTruong",
+      "label": "Số điện thoại Kế toán trưởng",
+      "maxLength": 20
+    },
+    "EmailKeToanTruong": {
+      "field": "EmailKeToanTruong",
+      "label": "Email Kế toán trưởng",
+      "type": "email",
+      "maxLength": 100
+    },
+    "DiaChiKeToanTruong": {
+      "field": "DiaChiKeToanTruong",
+      "label": "Địa chỉ Kế toán trưởng"
+    }
+  }
+}

@@ -1,0 +1,281 @@
+/* ===== DETAILS VIEW STYLES ===== */
+/* CSS tĩnh cho trang Template Details - tách riêng từ Details.cshtml */
+/* Tổ chức theo thứ tự: từ thẻ cha đến thẻ con, từ layout chính đến chi tiết */
+
+/* ========================================
+   1. LAYOUT CHÍNH - Main Layout Structure (Tỷ lệ 1:2)
+   ======================================== */
+
+/* Container chính cho layout 2 cột với tỷ lệ 1:2 */
+.main-layout {
+    display: flex;
+    width: 100%;
+    height: calc(100vh - 120px); /* Chiều cao bằng viewport trừ header/footer */
+    gap: 1rem;
+    align-items: stretch; /* Đảm bảo các panel có cùng chiều cao */
+    padding: 0 1rem; /* Padding nhỏ cho container */
+}
+
+/* Sidebar trái - 1/3 chiều rộng */
+.sidebar {
+    flex: 0 0 33.333%; /* Tỷ lệ 4/12 = 1/3 */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Content panel phải - 2/3 chiều rộng */
+.content-panel {
+    flex: 0 0 66.667%; /* Tỷ lệ 8/12 = 2/3 */
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* ========================================
+   2. CARD COMPONENTS - Thành phần Card
+   ======================================== */
+
+/* Card container chung */
+.card {
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Chiều cao đầy đủ của container */
+    overflow: hidden; /* Ngăn overflow ra ngoài card */
+}
+
+/* Card body - flexible content area */
+.card-body {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ========================================
+   3. DOCUMENT PREVIEW - Vùng hiển thị tài liệu
+   ======================================== */
+
+/* Container chính cho document preview với thanh cuộn */
+.document-preview {
+    overflow-y: auto;
+    padding: 1rem;
+    flex-grow: 1;
+    /* Các thuộc tính giống Word */
+    font-family: 'Times New Roman', Times, serif;
+    line-height: 1.15; /* Word default line-height */
+    background: #fff;
+    color: #000;
+    border: none;
+    outline: none;
+    /* Tab handling for better spacing */
+    tab-size: 4;
+    -moz-tab-size: 4;
+}
+
+/* Áp dụng font Times New Roman cho toàn bộ tài liệu HTML render */
+#html-preview, #html-preview * {
+    font-family: "Times New Roman", Times, serif !important;
+}
+
+/* ========================================
+   4. DOCUMENT PAGE - Trang tài liệu
+   ======================================== */
+
+/* Document page styling - rộng hơn, ít khoảng trắng */
+.document-page {
+    background: #fff;
+    /*padding: 2rem;*/ /* Padding nhỏ hơn để tận dụng không gian */
+    min-height: 100%;
+    width: 100%; /* Sử dụng toàn bộ chiều rộng có sẵn */
+    max-width: none; /* Bỏ giới hạn max-width */
+    margin: 0;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 1.15;
+    color: #000;
+    position: relative;
+    box-sizing: border-box;
+}
+
+/* Border cho document page */
+.document-page::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* border: 1px solid #ddd; */
+    pointer-events: none;
+}
+
+/* ========================================
+   5. IMAGE HANDLING - Xử lý hình ảnh
+   ======================================== */
+
+/* Image styling cơ bản để đảm bảo hiển thị đúng */
+.document-page img {
+    display: inline-block !important;
+    max-width: 100%;
+    height: auto;
+    vertical-align: top;
+    /* Ensure images are visible */
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Fix cho base64 images - fit trong container */
+img[src^="data:image"] {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    /* Fit completely within container */
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    /* Ensure proper scaling within container */
+    object-fit: contain !important;
+    /* Minimal spacing */
+    margin: 2px !important;
+}
+
+/* Xử lý đặc biệt cho logo images trong table cells */
+.document-page td img[src^="data:image"] {
+    /* Let image display at natural size but constrain to cell */
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    object-fit: contain !important;
+    margin: 2px !important;
+    /* Ensure image is always visible */
+    display: block !important;
+}
+
+/* Fix paragraph chứa images - override excessive margin-right */
+.document-page td p:has(img[src^="data:image"]),
+.document-page p:has(img[src^="data:image"]) {
+    /* Override excessive margin-right from Word document */
+    margin-right: 8pt !important;
+    /* Ensure paragraph doesn't push content out of view */
+    max-width: 100% !important;
+    overflow: visible !important;
+}
+
+/* Logo images trong paragraphs trong table cells */
+.document-page td p img[src^="data:image"] {
+    /* Force image to display with minimum size but allow scaling */
+    width: auto !important;
+    height: auto !important;
+    min-width: 50px !important;
+    object-fit: contain !important;
+    margin: 2px !important;
+    display: inline-block !important;
+    vertical-align: top;
+    /* Force visibility */
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Logo images trong paragraphs (general) */
+.document-page p img[src^="data:image"] {
+    /* Fit within paragraph flow */
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+    margin: 2px !important;
+}
+
+/* ========================================
+   6. TABLE STYLING - Styling bảng theo chuẩn Word
+   ======================================== */
+
+/* Table styling để match Word */
+.document-page table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12pt;
+    font-size: inherit;
+}
+
+/* Border cho table, th, td */
+.document-page table,
+.document-page th,
+.document-page td {
+    border: 1px solid #000;
+}
+
+/* Cell padding và alignment */
+.document-page th,
+.document-page td {
+    padding: 4pt 6pt;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.15;
+}
+
+/* Header styling */
+.document-page th {
+    background-color: transparent;
+    font-weight: bold;
+}
+
+/* Nested table styling */
+.document-page table table {
+    margin-bottom: 0;
+}
+
+/* ========================================
+   7. TEXT CONTENT - Nội dung văn bản
+   ======================================== */
+
+/* Paragraph spacing giống Word */
+.document-page p {
+    margin: 0 0 12pt 0;
+    text-align: justify;
+}
+
+/* ========================================
+   8. MAPPED FIELD HIGHLIGHTING - Highlight trường đã map
+   ======================================== */
+
+/* Mapped field highlighting - subtle như Word comments */
+.mapped-field {
+    padding: 1px 2px;
+    border-radius: 2px;
+    background-color: #cfe2ff;
+    color: #074cb3;
+}
+
+/* ========================================
+   9. RESPONSIVE DESIGN - Thiết kế responsive
+   ======================================== */
+
+/* Responsive adjustments cho màn hình vừa */
+@media (max-width: 1200px) {
+    .document-page {
+        max-width: 100%;
+        margin: 0;
+        padding: 48px 36px;
+    }
+}
+
+/* Responsive adjustments cho màn hình nhỏ */
+@media (max-width: 768px) {
+    .word-document-preview {
+        padding: 10px;
+    }
+
+    .document-page {
+        padding: 24px 18px;
+        font-size: 11pt;
+    }
+
+    .html-preview-container {
+        overflow-x: auto;
+    }
+}

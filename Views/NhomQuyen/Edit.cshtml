@@ -1,0 +1,64 @@
+﻿@model CTOM.ViewModels.EditRoleViewModel
+
+@{
+    ViewData["Title"] = "Chỉnh sửa Nhóm quyền";
+}
+
+<div class="container mt-4">
+    <div class="card col-md-6 mx-auto"> 
+        <div class="card-header bg-yellow text-white">
+            <h3 class="card-title fw-bold">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-shield-cog me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 21a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.078 4.02" /><path d="M19.001 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M19.001 15.5v1.5" /><path d="M19.001 21v1.5" /><path d="M22.032 17.25l-1.299 .75" /><path d="M17.27 20l-1.3 .75" /><path d="M15.97 17.25l1.3 .75" /><path d="M20.733 20l1.3 .75" /></svg>
+                 @ViewData["Title"]: @Model.RoleName 
+            </h3>
+        </div>
+        <div class="card-body">
+            @* Form trỏ đến action Edit với route parameter là RoleName *@
+            <form asp-action="Edit" asp-route-roleName="@Model.RoleName"> 
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger alert-important" role="alert"></div>
+                
+                @* Truyền RoleName ẩn đi để kiểm tra khớp ở Controller nếu cần, hoặc chỉ dựa vào route *@
+                <input type="hidden" asp-for="RoleName" /> 
+
+                 @* Tên nhóm (Mã nhóm) - Chỉ đọc *@
+                 <div class="mb-3">
+                    <label asp-for="RoleName" class="form-label"></label>
+                    <input asp-for="RoleName" class="form-control" readonly disabled/> @* Thêm disabled để rõ ràng hơn *@
+                 </div>
+
+                @* Tên nhóm đầy đủ - Cho sửa *@
+                 <div class="mb-3">
+                    <label asp-for="TenNhomDayDu" class="form-label"></label>
+                    <input asp-for="TenNhomDayDu" class="form-control" />
+                    <span asp-validation-for="TenNhomDayDu" class="text-danger"></span>
+                </div>
+
+                @* Trạng thái - Cho sửa *@
+                <div class="mb-3">
+                    <label asp-for="TrangThai" class="form-label required"></label>
+                    <select asp-for="TrangThai" class="form-select"> 
+                        <option value="A">Active</option>
+                        <option value="D">Disabled</option>
+                    </select>
+                     <span asp-validation-for="TrangThai" class="text-danger"></span>
+                </div>
+
+                <div class="mt-4 d-flex">  
+                    <button type="submit" class="btn btn-primary shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-floppy me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>
+                        Lưu thay đổi
+                        </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary ms-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-back-up me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9 14l-4 -4l4 -4" /><path d="M5 10h11a4 4 0 1 1 0 8h-1" /></svg>
+                        Quay lại danh sách
+                        </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+   <partial name="_CoreValidationScriptsPartial" />
+}

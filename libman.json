@@ -1,0 +1,119 @@
+{
+    "version": "1.0",
+    "defaultProvider": "cdnjs",
+    "libraries": [
+        {
+            "library": "jquery@3.7.1",
+            "destination": "wwwroot/lib/jquery/",
+            "files": ["jquery.min.js"]
+        },
+        {
+            "library": "bootstrap@5.3.3",
+            "destination": "wwwroot/lib/bootstrap/"
+        },
+        {
+            "library": "datatables.net@2.2.2",
+            "destination": "wwwroot/lib/datatables/js/"
+        },
+        {
+            "library": "datatables.net-bs5@2.2.2",
+            "destination": "wwwroot/lib/datatables/bs5/"
+        },
+        {
+            "library": "bootstrap-datepicker@1.10.0",
+            "destination": "wwwroot/lib/bootstrap-datepicker/",
+            "files": [
+                "css/bootstrap-datepicker.min.css",
+                "js/bootstrap-datepicker.min.js",
+                "locales/bootstrap-datepicker.vi.min.js"
+            ]
+        },
+        {
+            "library": "jquery-validate@1.21.0",
+            "destination": "wwwroot/lib/jquery-validation/",
+            "files": ["jquery.validate.min.js"]
+        },
+        {
+            "library": "jquery-validation-unobtrusive@4.0.0",
+            "destination": "wwwroot/lib/jquery-validation-unobtrusive/",
+            "files": ["jquery.validate.unobtrusive.min.js"]
+        },
+        {
+            "library": "sweetalert2@11.11.0",
+            "destination": "wwwroot/lib/sweetalert2/",
+            "files": [
+                "sweetalert2.all.min.js",
+                "sweetalert2.min.css"
+            ]
+        },
+        {
+            "provider": "unpkg",
+            "library": "docx-preview@0.3.5",
+            "destination": "wwwroot/lib/docx-preview/",
+            "files": [
+                "dist/docx-preview.js",
+                "dist/docx-preview.min.js"
+            ]
+        },
+        {
+            "provider": "unpkg",
+            "library": "jszip@3.10.1",
+            "destination": "wwwroot/lib/jszip/",
+            "files": [
+                "dist/jszip.js",
+                "dist/jszip.min.js"
+            ]
+        },
+        {
+            "provider": "unpkg",
+            "library": "pizzip@3.2.0",
+            "destination": "wwwroot/lib/pizzip/",
+            "files": [
+                "dist/pizzip.min.js"
+            ]
+        },
+        {
+            "provider": "unpkg",
+            "library": "docxtemplater@3.65.1",
+            "destination": "wwwroot/lib/docxtemplater/",
+            "files": [
+                "build/docxtemplater.js"
+            ]
+        },
+        {
+            "provider": "unpkg",
+            "library": "file-saver@2.0.5",
+            "destination": "wwwroot/lib/file-saver/",
+            "files": [
+                "dist/FileSaver.min.js"
+            ]
+        },
+        {
+            "provider": "filesystem",
+            "library": "wwwroot/lib/tailwind",
+            "destination": "wwwroot/lib/tailwind",
+            "files": [
+              "tailwind-3.4.17.min.css"
+            ]
+        },
+        {
+            "provider": "jsdelivr",
+            "library": "lucide@0.525.0",
+            "destination": "wwwroot/lib/lucide",
+            "files": [
+                "dist/umd/lucide.min.js"
+            ]
+        },
+        {
+            "provider": "filesystem",
+            "library": "wwwroot/lib/tabler",
+            "destination": "wwwroot/lib/tabler",
+            "files": [
+                "css/tabler.min.css",
+                "css/tabler-icons.min.css",
+                "js/tabler.min.js"
+            ]
+        }
+
+    ]
+}

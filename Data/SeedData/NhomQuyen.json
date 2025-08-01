@@ -1,0 +1,30 @@
+[
+	{
+		"Id": "cf421587-824c-4da4-b70c-29d346951206",
+		"TrangThai": "A",
+		"TenNhomDayDu": "Nhóm quyền dùng cho test",
+		"Name": "TEST",
+		"NormalizedName": "TEST"
+	},
+	{
+		"Id": "d1b5952a-2162-46c7-b29e-1a2a68922c14",
+		"TrangThai": "A",
+		"TenNhomDayDu": "Quản trị chương trình",
+		"Name": "ADMIN",
+		"NormalizedName": "ADMIN"
+	},
+	{
+		"Id": "e2b6952b-3163-47c8-b39f-2b3b78923d15",
+		"TrangThai": "A",
+		"TenNhomDayDu": "Hỗ trợ tín dụng",
+		"Name": "HTTD",
+		"NormalizedName": "HTTD"
+	},
+	{
+		"Id": "f3b7953c-4164-48d9-b49a-3c4c89924e16",
+		"TrangThai": "A",
+		"TenNhomDayDu": "Vấn tin báo cáo",
+		"Name": "VANTIN",
+		"NormalizedName": "VANTIN"
+	}
+]

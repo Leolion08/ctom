@@ -1,0 +1,143 @@
+@model CTOM.ViewModels.Form.FormCopyViewModel
+@{
+    ViewData["Title"] = "Sao chép giao dịch";
+}
+
+<!-- Link tới file CSS mới -->
+<link rel="stylesheet" href="~/css/form/form-copy.css" asp-append-version="true" />
+
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    <i class="ti ti-copy me-2"></i>
+                    @ViewData["Title"]
+                </h2>
+                <div class="text-muted mt-1">
+                    Tạo một giao dịch mới dựa trên dữ liệu có sẵn.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <!-- Cấu trúc layout 2 cột đồng nhất -->
+        <div class="main-layout two-column">
+            <!-- CỘT TRÁI: FORM NHẬP LIỆU -->
+            <div class="form-input-area">
+                <!-- Form sẽ POST đến Action 'Create' để tạo bản ghi mới -->
+                <form id="copyForm" asp-action="Create" method="post" class="card h-100 d-flex flex-column">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="TemplateId" value="@Model.TemplateId" />
+
+                    <div class="card-header py-2">
+                        <h3 class="card-title mb-0">Nhập dữ liệu</h3>
+                    </div>
+                    <div class="card-body overflow-auto">
+                        <!-- Thông tin chung -->
+                        <fieldset class="form-fieldset">
+                            <div class="row mb-3">
+                                <label class="col-sm-4 col-form-label">Tên template</label>
+                                <div class="col-sm-8">
+                                    <input type="text" asp-for="TemplateName" class="form-control bg-light" readonly />
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <label asp-for="Note" class="col-sm-4 col-form-label"></label>
+                                <div class="col-sm-8">
+                                    <textarea asp-for="Note" name="Note" class="form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!-- Trường động -->
+                        <fieldset class="form-fieldset mt-3">
+                             <div id="dynamicFieldsContainer">
+                                <div class="text-center p-5"><div class="spinner-border"></div></div>
+                             </div>
+                        </fieldset>
+                    </div>
+                    <div class="card-footer text-end bg-white mt-auto">
+                        <a asp-action="Index" class="btn btn-secondary me-auto">
+                            <i class="ti ti-x me-2"></i>Hủy
+                        </a>
+                        <button id="btnSave" class="btn btn-primary" type="submit">
+                            <i class="ti ti-device-floppy me-2"></i>Lưu
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <!-- CỘT PHẢI: HTML PREVIEW -->
+            <div class="preview-area">
+                <div class="card h-100 d-flex flex-column">
+                    <div class="card-header py-2">
+                        <h3 class="card-title mb-0">Xem trước thay đổi</h3>
+                    </div>
+                    <div class="card-body" id="preview-pane-body">
+                        <div class="document-preview" id="htmlPreviewContainer">
+                             <div class="document-page" id="html-preview">
+                                @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
+                                {
+                                    @Html.Raw(Model.HtmlContent)
+                                }
+                                else
+                                {
+                                    <div class="text-center p-5 text-muted">
+                                        <p class="mt-2">Không có nội dung xem trước cho template này.</p>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận (giữ nguyên) -->
+<div class="modal fade" id="customModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div id="modalStatus" class="modal-status bg-primary"></div>
+            <div class="modal-body text-center py-4">
+                <i id="modalIcon" class="ti ti-info-circle" style="font-size: 3rem;"></i>
+                <h4 id="modalTitle" class="mt-2">Thông báo</h4>
+                <div id="modalMessage" class="text-muted"></div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button id="modalCancelBtn" type="button" class="btn w-100" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="col">
+                            <button id="modalConfirmBtn" type="button" class="btn btn-primary w-100"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Loại bỏ các thư viện cũ -->
+    <script src="~/lib/pizzip/dist/pizzip.min.js"></script>
+    <script src="~/lib/docxtemplater/build/docxtemplater.js"></script>
+    <script src="~/lib/file-saver/dist/FileSaver.min.js"></script>
+
+    <!-- Truyền dữ liệu ban đầu -->
+    <script>
+        window.initialFormData = @Html.Raw(Model.FormDataJson ?? "{}");
+        window.templateId = @Model.TemplateId;
+    </script>
+
+    <!-- Sử dụng các file script đã nâng cấp -->
+    <script src="~/js/form/form-common.js" asp-append-version="true"></script>
+    <script src="~/js/form/form-copy.js" asp-append-version="true"></script>
+}

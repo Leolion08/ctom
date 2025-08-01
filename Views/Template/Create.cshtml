@@ -1,0 +1,179 @@
+@model CTOM.ViewModels.Template.TemplateViewModel
+@* @using CTOM.Models.Enums *@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    ViewData["Title"] = "Thêm mới Template";
+    ViewData["ActivePage"] = "Quản lý Template";
+
+    @* // Đặt giá trị mặc định cho Status là Draft
+    if (Model != null)
+    {
+        Model.Status = TemplateStatus.Draft.ToString();
+    } *@
+
+    // Lấy danh sách BusinessOperation
+    var businessOperations = ViewBag.BusinessOperations as IEnumerable<SelectListItem> ?? new List<SelectListItem>();
+    var groupedBusinessOperations = businessOperations
+        .GroupBy(x => "Tất cả nghiệp vụ") // Nhóm tất cả vào một nhóm
+        .OrderBy(g => g.Key)
+        .ToList();
+}
+
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    <i class="ti ti-plus me-2"></i>
+                    @ViewData["Title"]
+                </h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                        <path d="M9 11l-4 4l4 4m-4 -4h11a4 4 0 0 0 0 -8h-1"></path>
+                    </svg>
+                    Quay lại danh sách
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <form asp-action="Create" method="post" enctype="multipart/form-data">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Thông tin cơ bản</h3>
+                </div>
+                <div class="card-body">
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                    <div class="row mb-3">
+                        <label asp-for="BusinessOperationId" class="col-sm-3 col-form-label required"></label>
+                        <div class="col-sm-9">
+                            <select asp-for="BusinessOperationId" class="form-select" required>
+                                <option value="">-- Chọn nghiệp vụ --</option>
+                                @foreach (var item in businessOperations)
+                                {
+                                    if (string.IsNullOrEmpty(item.Value))
+                                    {
+                                        <option value="" disabled style="font-weight: bold;">@item.Text</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@item.Value">@item.Text</option>
+                                    }
+                                }
+                            </select>
+                            <span asp-validation-for="BusinessOperationId" class="text-danger"></span>
+                            @* <small class="form-hint">Chỉ chọn nghiệp vụ cấp con (có dấu + ở đầu)</small> *@
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label asp-for="TemplateName" class="col-sm-3 col-form-label required"></label>
+                        <div class="col-sm-9">
+                            <input asp-for="TemplateName" class="form-control" required />
+                            <span asp-validation-for="TemplateName" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label asp-for="Description" class="col-sm-3 col-form-label"></label>
+                        <div class="col-sm-9">
+                            <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="Description" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label class="col-sm-3 col-form-label required">File Template (.docx)</label>
+                        <div class="col-sm-9">
+                            <div class="form-control-file">
+                                <input type="file" name="templateFile" class="form-control" accept=".docx" required />
+                                <small class="form-hint">Chỉ chấp nhận file .docx, tối đa @(ViewData["MaxFileSizeMB"])MB</small>
+                            </div>
+                            <span class="text-danger field-validation-valid" data-valmsg-for="templateFile" data-valmsg-replace="true"></span>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="card-footer text-end">
+                    <button type="submit" class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            <path d="M5 12l5 5l10 -10"></path>
+                        </svg>
+                        Lưu
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary ms-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            <path d="M18 6l-12 12"></path>
+                            <path d="M6 6l12 12"></path>
+                        </svg>
+                        Hủy bỏ
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_CoreValidationScriptsPartial");}
+
+    <script>
+        $(document).ready(function() {
+            // Kích hoạt validation
+            $('form').validate({
+                errorClass: 'invalid-feedback',
+                highlight: function(element, errorClass) {
+                    $(element).addClass('is-invalid').removeClass('is-valid');
+                    $(element).closest('.form-group').find('.invalid-feedback').show();
+                },
+                unhighlight: function(element, errorClass) {
+                    $(element).removeClass('is-invalid').addClass('is-valid');
+                    $(element).closest('.form-group').find('.invalid-feedback').hide();
+                },
+                errorPlacement: function(error, element) {
+                    if (element.attr('type') === 'file') {
+                        error.insertAfter(element.parent());
+                    } else {
+                        error.insertAfter(element);
+                    }
+                }
+            });
+
+            // Xử lý file upload
+            $('input[type="file"]').on('change', function() {
+                var fileInput = $(this)[0];
+                var maxSize = @(ViewData["MaxFileSizeBytes"] ?? (2 * 1024 * 1024)); // Lấy từ cấu hình hoặc mặc định 2MB
+                var maxSizeMB = @(ViewData["MaxFileSizeMB"] ?? 2);
+
+                if (fileInput.files.length > 0) {
+                    var fileSize = fileInput.files[0].size;
+                    var fileName = fileInput.files[0].name;
+                    var fileExt = fileName.split('.').pop().toLowerCase();
+
+                    if (fileSize > maxSize) {
+                        showErrorModal(`Kích thước file vượt quá ${maxSizeMB}MB`);
+                        $(this).val('');
+                        return false;
+                    }
+
+                    if (fileExt !== 'docx') {
+                        showErrorModal('Chỉ chấp nhận file định dạng .docx');
+                        $(this).val('');
+                        return false;
+                    }
+                }
+                return true;
+            });
+        });
+    </script>
+}

@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="vi">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<meta http-equiv="X-UA-Compatible" content="ie=edge" />
+	<title>@ViewData["Title"] - CTOM</title>
+
+	<script>
+		// Lấy URL gốc của ứng dụng (quan trọng, để các file JS có thể truy cập)
+		window.appBaseUrl = '@Url.Content("~/")'; // VD: "/app/" nếu deploy tại /app
+	</script>
+
+	<!-- CSS -->
+	@* Ưu tiên bootstrap *@
+	<link href="~/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet" asp-append-version="true" />
+	<link href="~/lib/datatables/bs5/datatables.bootstrap5.min.css" rel="stylesheet" asp-append-version="true" />
+	<link href="~/lib/tabler/css/tabler.min.css" rel="stylesheet" asp-append-version="true" />
+	<link href="~/lib/tabler/css/tabler-icons.min.css" rel="stylesheet" asp-append-version="true" />
+	<link href="~/lib/sweetalert2/sweetalert2.min.css" rel="stylesheet" asp-append-version="true" />
+	<link href="~/css/site.css" rel="stylesheet" asp-append-version="true" />
+
+	<!-- Favicon -->
+	<link rel="icon" href="~/favicon.ico" type="image/x-icon" />
+
+	<!-- Các file CSS tùy chỉnh từ các view -->
+	@await RenderSectionAsync("Styles", required: false)
+
+	<style>
+		body {
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.page-body {
+			margin-top: 0.4rem !important;
+			margin-bottom: 0.0rem !important;
+		}
+
+		.page-wrapper {
+			flex: 1;
+		}
+
+		.validation-summary-errors ul {
+			padding-left: 1.5rem;
+			list-style: disc;
+		}
+
+		.dropdown-toggle::after {
+			border-top: 0 !important; /* border mũi tên xuống */
+		}
+
+		/* ================================================================== */
+        /* === CUSTOM MENU STYLES (REVISED) === */
+        /* ================================================================== */
+
+        /* --- General link style --- */
+        .navbar-nav .nav-link {
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        /* --- Hover state --- */
+        .navbar-nav .nav-item .nav-link:hover {
+            background-color: var(--tblr-primary-lt); /* Sử dụng màu sáng hơn của màu chính */
+            color: var(--tblr-primary);
+        }
+
+        /* --- Icon color on Hover state --- */
+        .navbar-nav .nav-item .nav-link:hover .nav-link-icon {
+            color: var(--tblr-primary);
+        }
+
+        /* --- Specific Icon Colors (using href attribute selector) --- */
+
+        .navbar-nav .nav-link-icon {
+            color: #2fb344; /* green */
+        }
+	</style>
+
+</head>
+<body data-bs-theme="light" data-controller="@ViewContext.RouteData.Values["controller"]">
+	<div class="page">
+		<header class="navbar navbar-expand-md navbar-light d-print-none">
+			<div class="container-xl">
+				<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false" aria-label="Toggle navigation">
+					<span class="navbar-toggler-icon"></span>
+				</button>
+				<h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
+					<a asp-controller="Home" asp-action="Index">CTOM</a>
+				</h1>
+				<!-- THEME icon-->
+				@* <div class="navbar-nav order-md-last">
+					<div class="nav-item">
+						<a href="?theme=dark" class="nav-link text-center px-0 hide-theme-dark" data-bs-toggle="tooltip" data-bs-placement="bottom" aria-label="Enable dark mode" data-bs-original-title="Enable dark mode">
+							<!-- Download SVG icon from http://tabler.io/icons/icon/moon -->
+							<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1">
+								<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"></path>
+							</svg>
+						</a>
+						<a href="?theme=light" class="nav-link text-center align-bottom px-0 hide-theme-light min-height:0" data-bs-toggle="tooltip" data-bs-placement="bottom" aria-label="Enable light mode" data-bs-original-title="Enable light mode">
+							<!-- Download SVG icon from http://tabler.io/icons/icon/sun -->
+							<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1">
+								<path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"></path>
+								<path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"></path>
+							</svg>
+						</a>
+					</div>
+				</div> *@
+				<!-- //THEME icon-->
+
+				<div class="navbar-nav flex-row order-md-last">
+					<partial name="_LoginPartial" />
+				</div>
+
+				<div class="collapse navbar-collapse" id="navbar-menu">
+					<div class="d-flex flex-column flex-md-row flex-fill align-items-stretch align-items-md-center">
+						<ul class="navbar-nav">
+						@* Quản trị hệ thống - Chỉ dành cho ADMIN *@
+						@if (User.IsInRole("ADMIN"))
+						{
+							<li class="nav-item dropdown">
+								<a class="nav-link dropdown-toggle" href="#navbar-admin" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+									<span class="nav-link-icon d-md-none d-lg-inline-block">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
+											<path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+										</svg>
+									</span>
+									<span class="nav-link-title">
+										Quản trị hệ thống
+									</span>
+								</a>
+								<div class="dropdown-menu">
+									<!-- Quản lý Phòng Ban -->
+									<a class="dropdown-item" asp-controller="PhongBan" asp-action="Index">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building-community me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M8 9l5 5v7h-5v-4m0 4h-5v-7l5 -5m1 1v-6a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v17h-8" />
+											<path d="M13 7l0 .01" />
+											<path d="M17 7l0 .01" />
+											<path d="M17 11l0 .01" />
+											<path d="M17 15l0 .01" />
+										</svg>
+										Quản lý Phòng Ban
+									</a>
+
+									<!-- Quản lý Nhóm Quyền -->
+									<a class="dropdown-item" asp-controller="NhomQuyen" asp-action="Index">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-shield-check me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 .114 5.04" />
+											<path d="M15 19l2 2l4 -4" />
+										</svg>
+										Quản lý Nhóm Quyền
+									</a>
+
+									<!-- Quản lý Người dùng -->
+									<a class="dropdown-item" asp-controller="NguoiSuDung" asp-action="Index">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+											<path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+											<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+											<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
+										</svg>
+										Quản lý Người dùng
+									</a>
+								</div>
+							</li>
+						}
+
+
+
+						@* Kho dữ liệu khách hàng - Dành cho HTTD *@
+						@if (User.IsInRole("HTTD"))
+						{
+							<li class="nav-item dropdown">
+								<a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+									<span class="nav-link-icon d-md-none d-lg-inline-block">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-database" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M12 6m-8 0a8 3 0 1 0 16 0a8 3 0 1 0 -16 0" />
+											<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
+											<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
+										</svg>
+									</span>
+									<span class="nav-link-title">
+										Kho dữ liệu khách hàng
+									</span>
+								</a>
+								<div class="dropdown-menu">
+									<a class="dropdown-item" asp-controller="KhachHangDN" asp-action="Index">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building-skyscraper me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M3 21l18 0" />
+											<path d="M5 21v-14l8 -4v18" />
+											<path d="M19 21v-10l-6 -4" />
+											<path d="M9 9l0 .01" />
+											<path d="M9 12l0 .01" />
+											<path d="M9 15l0 .01" />
+											<path d="M9 18l0 .01" />
+										</svg>
+										Khách hàng doanh nghiệp
+									</a>
+									<a class="dropdown-item disabled" href="#">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+											<path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+										</svg>
+										Khách hàng cá nhân
+									</a>
+								</div>
+							</li>
+						}
+
+						@* Dành cho ADMIN và HTTD *@
+						@if (User.IsInRole("ADMIN") || User.IsInRole("HTTD"))
+						{
+							@* Quản lý mẫu biểu *@
+							<li class="nav-item">
+								<a class="nav-link" asp-controller="Template" asp-action="Index">
+									<span class="nav-link-icon d-md-none d-lg-inline-block">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-text" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M14 3v4a1 1 0 0 0 1 1h4" />
+											<path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+											<path d="M9 9l1 0" />
+											<path d="M9 13l6 0" />
+											<path d="M9 17l6 0" />
+										</svg>
+									</span>
+									<span class="nav-link-title">
+										Quản lý mẫu biểu
+									</span>
+								</a>
+							</li>
+
+							@* Quản lý giao dịch *@
+							<li class="nav-item">
+								<a class="nav-link" asp-controller="Form" asp-action="Index">
+									<span class="nav-link-icon d-md-none d-lg-inline-block">
+										<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-list-details">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M13 5h8" />
+											<path d="M13 9h5" />
+											<path d="M13 15h8" />
+											<path d="M13 19h5" />
+											<path d="M3 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+											<path d="M3 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+										</svg>
+									</span>
+									<span class="nav-link-title">
+										Quản lý giao dịch
+									</span>
+								</a>
+							</li>
+						}
+
+						@* Vấn tin - Dành cho VANTIN *@
+						@if (User.IsInRole("VANTIN"))
+						{
+							<li class="nav-item">
+								<a class="nav-link" asp-controller="VanTin" asp-action="Index">
+									<span class="nav-link-icon d-md-none d-lg-inline-block">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-text" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+											<path d="M14 3v4a1 1 0 0 0 1 1h4" />
+											<path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+											<path d="M9 9l1 0" />
+											<path d="M9 13l6 0" />
+											<path d="M9 17l6 0" />
+										</svg>
+									</span>
+									<span class="nav-link-title">Vấn tin</span>
+								</a>
+							</li>
+						}
+						</ul>
+					</div>
+				</div>
+
+			</div>
+		</header>
+
+		<div class="page-wrapper">
+			<div class="page-body">
+				<div class="container-xl">
+					<partial name="_Notification" />
+					@RenderBody()
+				</div>
+			</div>
+			<footer class="footer footer-transparent d-print-none" style="padding: 1rem !important;">
+				<div class="container-xl">
+					<div class="row text-center align-items-center flex-row-reverse">
+						<div class="col-12 col-lg-auto mt-3 mt-lg-0">
+							<ul class="list-inline list-inline-dots mb-0">
+								<li class="list-inline-item">
+									Copyright &copy; @DateTime.Now.Year
+									BIDV.SGD3
+								</li>
+							</ul>
+							</div>
+						</div>
+					</div>
+				</footer>
+			</div>
+		</div>
+
+		<!-- JS Libraries -->
+		@* jQuery 3.7.1 (required for Bootstrap, DataTables, and other plugins) *@
+		<script src="~/lib/jquery/jquery.min.js" asp-append-version="true"></script>
+
+		<!-- SweetAlert2 -->
+		<link href="~/lib/sweetalert2/sweetalert2.min.css" rel="stylesheet" asp-append-version="true" />
+		<script src="~/lib/sweetalert2/sweetalert2.all.min.js" asp-append-version="true"></script>
+
+		<!-- Bootstrap Datepicker -->
+		<link href="~/lib/bootstrap-datepicker/css/bootstrap-datepicker.min.css" rel="stylesheet" asp-append-version="true" />
+		<script src="~/lib/bootstrap-datepicker/js/bootstrap-datepicker.min.js" asp-append-version="true"></script>
+		<script src="~/lib/bootstrap-datepicker/locales/bootstrap-datepicker.vi.min.js" asp-append-version="true"></script>
+
+		<script>
+			// Cấu hình mặc định cho SweetAlert2
+			const Toast = Swal.mixin({
+				toast: true,
+				position: 'top-end',
+				showConfirmButton: false,
+				timer: 3000,
+				timerProgressBar: true,
+				didOpen: (toast) => {
+					toast.addEventListener('mouseenter', Swal.stopTimer);
+					toast.addEventListener('mouseleave', Swal.resumeTimer);
+				}
+			});
+
+			// Hàm helper để hiển thị thông báo
+			window.showToast = function (type, message) {
+				Toast.fire({
+					icon: type,
+					title: message
+				});
+			};
+
+			// Hàm hiển thị thông báo lỗi
+			window.showError = function (message) {
+				return Swal.fire({
+					icon: 'error',
+					title: 'Lỗi',
+					text: message,
+					confirmButtonText: 'Đóng'
+				});
+			};
+
+			// Hàm hiển thị thông báo thành công
+			window.showSuccess = function (message) {
+				return Swal.fire({
+					icon: 'success',
+					title: 'Thành công',
+					text: message,
+					timer: 2000,
+					showConfirmButton: false
+				});
+			};
+
+			// Khởi tạo datepicker
+			$(document).ready(function() {
+				$('.datepicker').datepicker({
+					format: 'dd/mm/yyyy',
+					autoclose: true,
+					language: 'vi',
+					todayHighlight: true
+				});
+			});
+		</script>
+
+
+	@* DataTables and related libraries *@
+	<script src="~/lib/datatables/js/datatables.min.js" asp-append-version="true"></script>
+	<script src="~/lib/datatables/bs5/datatables.bootstrap5.min.js" asp-append-version="true"></script>
+
+	@* Tabler UI *@
+	<script src="~/lib/tabler/js/tabler.min.js" asp-append-version="true"></script>
+
+	@* jQuery Validation and Unobtrusive Validation *@
+	<script src="~/lib/jquery-validation/jquery.validate.min.js" asp-append-version="true"></script>
+	<script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js" asp-append-version="true"></script>
+
+	@* Custom Scripts *@
+
+	<script src="~/js/common.js" asp-append-version="true"></script>
+	<script src="~/js/site.js" asp-append-version="true"></script>
+	<script src="~/js/site.modal-delete.js" asp-append-version="true"></script>
+
+	@* Section Scripts cho các view con *@
+	@await RenderSectionAsync("Scripts", required: false)
+
+</body>
+</html>

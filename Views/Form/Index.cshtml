@@ -1,0 +1,306 @@
+@using CTOM.ViewModels.Form
+@model FormListVM
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@inject CTOM.Services.Interfaces.ICurrentUserAccessor CurrentUser
+@{
+    ViewData["Title"] = "Giao dịch nhập liệu";
+    ViewData["ActivePage"] = "Quản lý giao dịch";
+    var requestToken = Xsrf.GetAndStoreTokens(Context).RequestToken;
+}
+
+<!-- Notification area -->
+@* <div id="notificationPlaceholder">
+    @if (ViewData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible bg-success-lt" role="alert">
+            @ViewData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (ViewData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-important alert-dismissible bg-yellow-lt" role="alert">
+            @ViewData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+</div> *@
+
+<div class="card">
+    <div class="card-header" style="background-color: var(--tblr-body-bg);">
+        <h3 class="card-title text-uppercase fw-bold">@ViewData["Title"]</h3>
+        <div class="card-actions">
+            <a asp-action="Create" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M12 5l0 14"></path>
+                    <path d="M5 12l14 0"></path>
+                </svg>
+                Tạo mới
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <input type="text" id="formSearchInput" class="form-control" placeholder="Tìm kiếm theo CIF hoặc tên template...">
+                    <button id="formSearchButton" class="btn btn-outline-secondary" type="button">
+                        <i class="ti ti-search me-1"></i>
+                        Tìm
+                    </button>
+                    <button id="clearFormSearchButton" class="btn btn-outline-secondary" type="button" title="Xóa tìm kiếm">
+                        <i class="ti ti-x"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="forms-table" class="table table-vcenter table-striped table-bordered table-datatable" style="width:100%;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-center text-nowrap">ID</th>
+                        <th class="text-nowrap">Mẫu biểu sử dụng <i class='ti ti-search ti-xs text-muted ms-1' title='Tìm kiếm theo tên mẫu biểu'></i></th>
+                        <th class="text-nowrap">Ghi chú</th>
+                        <th class="text-nowrap">Số CIF <i class='ti ti-search ti-xs text-muted ms-1' title='Tìm kiếm theo số CIF'></i></th>
+                        <th class="text-nowrap">Phòng tạo</th>
+                        <th class="text-nowrap">Người tạo</th>
+                        <th class="text-nowrap">Ngày cập nhật</th>
+                        @* <th class="text-nowrap">Trạng thái</th> *@
+                        <th class="text-nowrap text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận xóa giao dịch -->
+<div class="modal modal-blur fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                @* <svg xmlns="http://www.w3.org/2000/svg" class="icon mb-2 text-danger icon-lg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M12 9v2m0 4v.01" />
+                    <path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75" />
+                </svg> *@
+                <i class="ti ti-alert-triangle text-danger" style="font-size: 3rem;"></i>
+                <h3>Xác nhận xóa</h3>
+                <div class="text-muted">
+                    Bạn có chắc chắn muốn xóa giao dịch <span id="modalItemName" class="fw-bold"></span> (ID: <span id="modalItemId"></span>)?
+                    <div class="mt-3">
+                        <small class="text-danger d-block">Hành động này không thể hoàn tác!</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">
+                                Hủy
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button type="button" id="confirmDeleteButton" class="btn btn-danger w-100">
+                                @* <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M4 7l16 0" />
+                                    <path d="M10 11l0 6" />
+                                    <path d="M14 11l0 6" />
+                                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                                    <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+                                </svg> *@
+                                <i class="ti ti-trash me-1" style="font-size: 1rem;"></i>
+                                Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <partial name="_CoreValidationScriptsPartial" />
+    <script src="~/js/datatable-helper.js" asp-append-version="true"></script>
+    <script>
+        const currentUser = '@CurrentUser.UserName.ToLowerInvariant()';
+        const currentDeptId = '@(CurrentUser.MaPhong ?? "")';
+
+        // URL Templates
+        const getDataTableUrl = '@Url.Action("GetDataTable", "Form")';
+        const detailsUrlTemplate = '@Url.Action("Details", "Form", new { id = "__ID__" })';
+        const editUrlTemplate = '@Url.Action("Edit", "Form", new { id = "__ID__" })';
+        const copyUrlTemplate = '@Url.Action("Copy", "Form", new { id = "__ID__" })';
+        const deleteUrlTemplate = '@Url.Action("Delete", "Form")'; // For modal delete
+
+        $(document).ready(function () {
+            const formsTable = $('#forms-table').DataTable({
+                processing: true,
+                serverSide: true,
+                searching: false,
+                orderMulti: false,
+                ajax: {
+                    url: getDataTableUrl,
+                    // THAY ĐỔI 1: Chuyển sang 'POST'
+                    // Ý NGHĨA: Gửi yêu cầu bằng phương thức POST để giữ cho URL sạch sẽ.
+                    type: 'POST',
+                    //type: 'GET',
+                    //dataSrc: 'data',
+                    data: function (d) {
+                        // THAY ĐỔI 2: Thêm Anti-Forgery Token vào dữ liệu gửi đi
+                        // Ý NGHĨA: Đây là bước bắt buộc để request POST được server chấp nhận khi có [ValidateAntiForgeryToken].
+                        d.__RequestVerificationToken = '@requestToken';
+
+                        // Thêm giá trị tìm kiếm tùy chỉnh
+                        const searchValue = $('#formSearchInput').val();
+                        if (searchValue) {
+                            d.q = searchValue.trim();
+                        }
+                        // DataTables sẽ tự động thêm các tham số còn lại (draw, start, length, order...) vào body.
+                    }
+                },
+                order: [[6, 'desc']], // Sắp xếp mặc định theo cột Ngày cập nhật
+                // THAY ĐỔI 3: Đảm bảo 'data' trong columns khớp với ViewModel trả về
+                // Ý NGHĨA: Các tên thuộc tính (formDataId, templateName,...) phải là camelCase
+                columns: [
+                    {
+                        data: 'formDataId', name: 'formDataId'
+                        , className: 'text-nowrap text-center', width: "6%"
+                    }, //0
+                    // THAY ĐỔI 3: Áp dụng render cắt ngắn cho các cột
+                    {
+                        data: null, name: 'templateName', orderable: true,
+                        width: "18%",
+                        render: function (data, type, row) {
+                            const text = `${row.templateId}-${row.templateName ?? ''}`.trim();
+                            return `<div class="text-truncate">${text}</div>`;
+                        }
+                    }, //1
+                    {
+                        data: 'note', name: 'note',
+                        width: "18%",
+                        render: function (data) {
+                            return `<div class="text-truncate">${data || ''}</div>`;
+                        }
+                    }, //2
+                    {
+                        data: null, name: 'soCif',
+                        className: 'text-nowrap text-center',
+                        width: "8%",
+                        render: d => `<span title="${d.tenCif ?? ''}">${d.soCif}</span>`
+                        //render: d => `<span data-bs-toggle="tooltip" title="${d.tenCif ?? ''}">${d.soCif}</span>`
+                    }, //3
+                    {
+                        data: 'createdDepartmentId', name: 'createdDepartmentId'
+                        , className: 'text-nowrap text-center', defaultContent: ''
+                        , width: "9%"
+                    }, //4
+                    { data: 'createdBy', name: 'createdBy', className: 'text-nowrap text-center', width: "9%" }, //5
+                    {
+                        data: 'updatedAt', name: 'updatedAt',
+                        className: 'text-nowrap text-center',
+                        width: "12%",
+                        render: d => formatDateTime(d, 'dd/MM/yyyy HH:mm') //datatable-helper
+                    }, //6
+                    @* { data: 'status', className: 'text-nowrap', defaultContent: '' }, //7 *@
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center text-nowrap',
+                        width: '230px',
+                        render: d => {
+                            const isOwner = d.createdBy.toLowerCase() === currentUser;
+                            const sameDept = d.createdDepartmentId === currentDeptId;
+                            const canView = isOwner || sameDept;
+
+                            const viewBtn = canView ? `<a href="${detailsUrlTemplate.replace('__ID__', d.formDataId)}" class="btn btn-sm btn-info" title="Xem chi tiết">
+                                    <i class="ti ti-eye me-1"></i><span class="d-none d-sm-inline">Xem</span>
+                                </a>` : '';
+                            const editBtn = isOwner ? `<a href="${editUrlTemplate.replace('__ID__', d.formDataId)}" class="btn btn-sm btn-warning" title="Sửa giao dịch">
+                                    <i class="ti ti-edit me-1"></i><span class="d-none d-sm-inline">Sửa</span>
+                                </a>` : '';
+                            /*const copyBtn = isOwner ? `<button type="button" class="btn btn-sm btn-success btn-copy-form" data-id="${d.formDataId}" title="Sao chép giao dịch">
+                                    <i class="ti ti-copy me-1"></i><span class="d-none d-sm-inline">Sao chép</span>
+                                </button>` : '';*/
+                            // SỬA ĐỔI: Chuyển nút Sao chép thành thẻ <a> trỏ đến action Copy
+                            const copyBtn = isOwner ? `<a href="${copyUrlTemplate.replace('__ID__', d.formDataId)}" class="btn btn-sm btn-success" title="Sao chép giao dịch">
+                                    <i class="ti ti-copy me-1"></i><span class="d-none d-sm-inline">Sao chép</span>
+                                </a>` : '';
+                            const deleteBtn = isOwner ? `<button type="button" class="btn btn-sm btn-danger delete-confirmation-button" data-id="${d.formDataId}" data-name="${d.templateName}" title="Xóa giao dịch">
+                                    <i class="ti ti-trash me-1"></i><span class="d-none d-sm-inline">Xóa</span>
+                                </button>` : '';
+                            return `<div class="d-flex gap-1" role="group">${viewBtn}${editBtn}${copyBtn}${deleteBtn}</div>`;
+                        }
+                    } //8
+                ],
+                "language": {
+                    "decimal": ",",
+                    "thousands": ".",
+                    "sProcessing": "Đang xử lý...",
+                    "sLengthMenu": "Hiển thị _MENU_ mục",
+                    "sZeroRecords": "Không tìm thấy dữ liệu",
+                    "sInfo": "Hiển thị _START_ đến _END_ của _TOTAL_ mục",
+                    "sInfoEmpty": "Hiển thị 0 đến 0 của 0 mục",
+                    "sInfoFiltered": "(lọc từ _MAX_ mục)",
+                    "sInfoPostFix": "",
+                    "sSearch": "Tìm kiếm:",
+                    "sUrl": "",
+                    "oPaginate": {
+                        "sFirst": "Đầu",
+                        "sPrevious": "Trước",
+                        "sNext": "Tiếp",
+                        "sLast": "Cuối"
+                    },
+                    "sEmptyTable": "Không có dữ liệu",
+                    "sLoadingRecords": "Đang tải...",
+                    "oAria": {
+                        "sSortAscending": ": kích hoạt để sắp xếp cột tăng dần",
+                        "sSortDescending": ": kích hoạt để sắp xếp cột giảm dần"
+                    }
+                },
+                drawCallback: function(settings) {
+                    // Gọi hàm helper, truyền vào API và chỉ số của các cột cần xử lý
+                    initializeTruncateTooltips(this.api(), [1, 2, 3]); // Cột 1 (Mẫu biểu) và 2 (Ghi chú)
+                }
+            });
+
+            // Khởi tạo chức năng XÓA (modal + reload DataTable)
+            initializeDataTableDeleteModal({
+                modalId: '#deleteConfirmModal',
+                triggerButtonSelector: '.delete-confirmation-button',
+                confirmButtonId: 'confirmDeleteButton',
+                nameElementSelector: '#modalItemName',
+                idElementSelector: '#modalItemId',
+                dataIdAttribute: 'data-id',
+                dataNameAttribute: 'data-name',
+                deleteUrlTemplate: deleteUrlTemplate + '/{id}', // Use the template defined above
+                dataTableInstance: formsTable,
+                antiForgeryToken: '@requestToken',
+                entityName: 'giao dịch'
+            });
+
+            // Xử lý tìm kiếm
+            $('#formSearchButton').on('click', function () {
+                formsTable.ajax.reload();
+            });
+            $('#formSearchInput').on('keyup', function (e) {
+                if (e.key === 'Enter') formsTable.ajax.reload();
+            });
+            $('#clearFormSearchButton').on('click', function () {
+                $('#formSearchInput').val('');
+                formsTable.ajax.reload();
+            });
+        });
+    </script>
+}

@@ -1,0 +1,382 @@
+[
+	{
+		"FieldID": 1,
+		"FieldName": "SoCif",
+		"DisplayName": "Số CIF",
+		"DataType": "TEXT",
+		"Description": "Số CIF của doanh nghiệp",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 1
+	},
+	{
+		"FieldID": 2,
+		"FieldName": "TenCif",
+		"DisplayName": "Tên khách hàng",
+		"DataType": "TEXT",
+		"Description": "Tên khách hàng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 2
+	},
+	{
+		"FieldID": 3,
+		"FieldName": "XepHangTinDungNoiBo",
+		"DisplayName": "Xếp hạng tín dụng nội bộ",
+		"DataType": "TEXT",
+		"Description": "Xếp hạng tín dụng nội bộ của khách hàng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 3
+	},
+	{
+		"FieldID": 4,
+		"FieldName": "SoGiayChungNhanDKKD",
+		"DisplayName": "Số Giấy chứng nhận ĐKKD",
+		"DataType": "TEXT",
+		"Description": "Số Giấy chứng nhận ĐKKD",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 4
+	},
+	{
+		"FieldID": 5,
+		"FieldName": "NoiCapGiayChungNhanDKKD",
+		"DisplayName": "Nơi cấp Giấy chứng nhận ĐKKD",
+		"DataType": "TEXT",
+		"Description": "Nơi cấp Giấy chứng nhận ĐKKD",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 5
+	},
+	{
+		"FieldID": 6,
+		"FieldName": "NgayCapGiayChungNhanDKKD",
+		"DisplayName": "Ngày cấp Giấy chứng nhận ĐKKD",
+		"DataType": "TEXT",
+		"Description": "Ngày cấp Giấy chứng nhận ĐKKD",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 6
+	},
+	{
+		"FieldID": 7,
+		"FieldName": "DiaChiKinhDoanhHienTai",
+		"DisplayName": "Địa chỉ kinh doanh hiện tại",
+		"DataType": "TEXT",
+		"Description": "Địa chỉ kinh doanh hiện tại",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 7
+	},
+	{
+		"FieldID": 8,
+		"FieldName": "LinhVucKinhDoanhChinh",
+		"DisplayName": "Lĩnh vực kinh doanh chính",
+		"DataType": "TEXT",
+		"Description": "Lĩnh vực kinh doanh chính",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 8
+	},
+	{
+		"FieldID": 9,
+		"FieldName": "TenNguoiDaiDienTheoPhapLuat",
+		"DisplayName": "Tên Người đại diện theo pháp luật",
+		"DataType": "TEXT",
+		"Description": "Tên người đại diện theo pháp luật",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 9
+	},
+	{
+		"FieldID": 10,
+		"FieldName": "ChucVu",
+		"DisplayName": "Chức vụ người đại diện",
+		"DataType": "TEXT",
+		"Description": "Chức vụ của người đại diện",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 10
+	},
+	{
+		"FieldID": 11,
+		"FieldName": "VanBanUyQuyenSo",
+		"DisplayName": "Văn bản ủy quyền số",
+		"DataType": "TEXT",
+		"Description": "Văn bản ủy quyền số",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 11
+	},
+	{
+		"FieldID": 12,
+		"FieldName": "SoDienThoaiDN",
+		"DisplayName": "Số điện thoại doanh nghiệp",
+		"DataType": "TEXT",
+		"Description": "Số điện thoại doanh nghiệp",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 12
+	},
+	{
+		"FieldID": 13,
+		"FieldName": "SoFaxCongTy",
+		"DisplayName": "Số Fax Công ty",
+		"DataType": "TEXT",
+		"Description": "Số Fax Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 13
+	},
+	{
+		"FieldID": 14,
+		"FieldName": "EmailCongTy",
+		"DisplayName": "Email Công ty",
+		"DataType": "TEXT",
+		"Description": "Email Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 14
+	},
+	{
+		"FieldID": 15,
+		"FieldName": "TenNguoiDaiDienTheoPhapLuat",
+		"DisplayName": "Tên Người đại diện theo pháp luật",
+		"DataType": "TEXT",
+		"Description": "Tên Người đại diện theo pháp luật",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 15
+	},
+	{
+		"FieldID": 17,
+		"FieldName": "NgaySinhDaiDienCongTy",
+		"DisplayName": "Ngày sinh đại diện Công ty",
+		"DataType": "DATE",
+		"Description": "Ngày sinh đại diện Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 17
+	},
+	{
+		"FieldID": 18,
+		"FieldName": "GioiTinhDaiDienCongTy",
+		"DisplayName": "Giới tính đại diện Công ty",
+		"DataType": "TEXT",
+		"Description": "Giới tính đại diện Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 18
+	},
+	{
+		"FieldID": 19,
+		"FieldName": "QuocTichDaiDienCongTy",
+		"DisplayName": "Quốc tịch đại diện Công ty",
+		"DataType": "TEXT",
+		"Description": "Quốc tịch đại diện Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 19
+	},
+	{
+		"FieldID": 20,
+		"FieldName": "SoGiayToTuyThanDaiDienCongTy",
+		"DisplayName": "Số giấy tờ tùy thân đại diện Công ty",
+		"DataType": "TEXT",
+		"Description": "Số giấy tờ tùy thân đại diện Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 20
+	},
+	{
+		"FieldID": 21,
+		"FieldName": "NgayCapGiayToTuyThanDaiDienDN",
+		"DisplayName": "Ngày cấp giấy tờ tùy thân đại diện DN",
+		"DataType": "DATE",
+		"Description": "Ngày cấp giấy tờ tùy thân đại diện DN",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 21
+	},
+	{
+		"FieldID": 22,
+		"FieldName": "NoiCapGiayToTuyThanDaiDienDN",
+		"DisplayName": "Nơi cấp giấy tờ tùy thân đại diện DN",
+		"DataType": "TEXT",
+		"Description": "Nơi cấp giấy tờ tùy thân đại diện DN",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 22
+	},
+	{
+		"FieldID": 23,
+		"FieldName": "NgayHetHanGiayToTuyThanDaiDienDN",
+		"DisplayName": "Ngày hết hạn giấy tờ tùy thân đại diện DN",
+		"DataType": "DATE",
+		"Description": "Ngày hết hạn giấy tờ tùy thân đại diện DN",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 23
+	},
+	{
+		"FieldID": 24,
+		"FieldName": "DiaChiDaiDienCongTy",
+		"DisplayName": "Địa chỉ đại diện Công ty",
+		"DataType": "TEXT",
+		"Description": "Địa chỉ đại diện Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 24
+	},
+	{
+		"FieldID": 25,
+		"FieldName": "SoDienThoaiDaiDienCongTy",
+		"DisplayName": "Số điện thoại đại diện Công ty",
+		"DataType": "TEXT",
+		"Description": "Số điện thoại đại diện Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 25
+	},
+	{
+		"FieldID": 26,
+		"FieldName": "EmailDaiDienCongTy",
+		"DisplayName": "Email đại diện Công ty",
+		"DataType": "TEXT",
+		"Description": "Email đại diện Công ty",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 26
+	},
+	{
+		"FieldID": 27,
+		"FieldName": "VanBanUyQuyenSo",
+		"DisplayName": "Văn bản ủy quyền số",
+		"DataType": "TEXT",
+		"Description": "Văn bản ủy quyền số",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 27
+	},
+	{
+		"FieldID": 28,
+		"FieldName": "TenKeToanTruong",
+		"DisplayName": "Tên Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Tên Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 28
+	},
+	{
+		"FieldID": 29,
+		"FieldName": "ChucVuKeToanTruong",
+		"DisplayName": "Chức vụ Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Chức vụ Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 29
+	},
+	{
+		"FieldID": 30,
+		"FieldName": "NgaySinhKeToanTruong",
+		"DisplayName": "Ngày sinh Kế toán trưởng",
+		"DataType": "DATE",
+		"Description": "Ngày sinh Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 30
+	},
+	{
+		"FieldID": 31,
+		"FieldName": "GioiTinhKeToanTruong",
+		"DisplayName": "Giới tính Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Giới tính Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 31
+	},
+	{
+		"FieldID": 32,
+		"FieldName": "QuocTichKeToanTruong",
+		"DisplayName": "Quốc tịch Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Quốc tịch Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 32
+	},
+	{
+		"FieldID": 33,
+		"FieldName": "SoGiayToTuyThanKeToanTruong",
+		"DisplayName": "Số giấy tờ tùy thân Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Số giấy tờ tùy thân Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 33
+	},
+	{
+		"FieldID": 34,
+		"FieldName": "NgayCapGiayToTuyThanKeToanTruong",
+		"DisplayName": "Ngày cấp giấy tờ tùy thân Kế toán trưởng",
+		"DataType": "DATE",
+		"Description": "Ngày cấp giấy tờ tùy thân Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 34
+	},
+	{
+		"FieldID": 35,
+		"FieldName": "NoiCapGiayToTuyThanKeToanTruong",
+		"DisplayName": "Nơi cấp giấy tờ tùy thân Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Nơi cấp giấy tờ tùy thân Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 35
+	},
+	{
+		"FieldID": 36,
+		"FieldName": "NgayHetHanGiayToTuyThanKeToanTruong",
+		"DisplayName": "Ngày hết hạn giấy tờ tùy thân Kế toán trưởng",
+		"DataType": "DATE",
+		"Description": "Ngày hết hạn giấy tờ tùy thân Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 36
+	},
+	{
+		"FieldID": 37,
+		"FieldName": "SoDienThoaiKeToanTruong",
+		"DisplayName": "Số điện thoại Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Số điện thoại Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 37
+	},
+	{
+		"FieldID": 38,
+		"FieldName": "EmailKeToanTruong",
+		"DisplayName": "Email Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Email Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 38
+	},
+	{
+		"FieldID": 39,
+		"FieldName": "DiaChiKeToanTruong",
+		"DisplayName": "Địa chỉ Kế toán trưởng",
+		"DataType": "TEXT",
+		"Description": "Địa chỉ Kế toán trưởng",
+		"IsActive": true,
+		"FieldTagPrefix": "CIF",
+		"DisplayOrder": 39
+	}
+]

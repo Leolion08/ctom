@@ -1,0 +1,316 @@
+/* ===== MAPPING VIEW STYLES ===== */
+/* CSS tĩnh cho trang Template Mapping - tách riêng từ Mapping.cshtml */
+/* Tổ chức theo thứ tự: từ thẻ cha đến thẻ con, từ layout chính đến chi tiết */
+
+/* ========================================
+   1. LAYOUT CHÍNH - Main Layout Structure
+   ======================================== */
+
+/* Container chính cho layout 3 cột */
+.main-layout {
+    display: flex;
+    width: 100%;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+/* Sidebar trái và phải - cố định width */
+.sidebar {
+    flex: 0 0 280px;
+    position: sticky;
+    top: 20px;
+}
+
+/* Content panel giữa - flexible */
+.content-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* ========================================
+   2. CARD COMPONENTS - Thành phần Card
+   ======================================== */
+
+/* Card container chung */
+.card {
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 100px);
+}
+
+/* Card body - flexible content area */
+.card-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Wrapper cho danh sách field - scrollable */
+.field-list-wrapper {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+/* ========================================
+   3. DOCUMENT PREVIEW - Vùng hiển thị tài liệu
+   ======================================== */
+
+/* Container chính cho document preview */
+#document-preview {
+    overflow-y: auto;
+    padding: 1rem;
+    font-family: 'Times New Roman', Times, serif;
+    line-height: 1.5;
+    background: #fff;
+    color: #000;
+    border: none;
+    outline: none;
+    user-select: text;
+    cursor: text;
+}
+
+/* Hover effect cho document preview */
+#document-preview:hover {
+    background: #f8f9fa;
+}
+
+/* Font family cho tất cả elements trong document preview */
+#document-preview * {
+    font-family: 'Times New Roman', Times, serif !important;
+}
+
+/* Hover effect cho elements có thể mapping */
+#document-preview [data-mappable="true"]:hover {
+    background-color: #e3f2fd !important;
+    cursor: pointer;
+}
+
+/* ========================================
+   4. DOCUMENT CONTENT - Nội dung tài liệu
+   ======================================== */
+
+/* Paragraph styling trong document */
+#document-preview p {
+    margin: 0;
+    padding: 0;
+    min-height: 1em;
+}
+
+/* Table styling trong document */
+#document-preview table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+/* Table cell styling */
+#document-preview td {
+    word-wrap: break-word;
+    vertical-align: top;
+}
+
+/* ========================================
+   5. FIELD PLACEHOLDER SYSTEM - Hệ thống placeholder
+   ======================================== */
+
+/* Base field placeholder styling */
+.field-placeholder {
+    background-color: #cfe2ff;
+    border: 1px dashed #0d6efd;
+    border-radius: 3px;
+    padding: 0.15em 0.4em;
+    margin: 0.05em;
+    color: #074cb3;
+    display: inline-block;
+    white-space: nowrap;
+    user-select: none;
+    font-size: clamp(9px, inherit, 16px);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    line-height: 1.1;
+    cursor: help;
+    position: relative;
+}
+
+/* Placeholder trong bảng con lồng - responsive */
+.nested-table .field-placeholder {
+    font-size: clamp(8px, 0.7em, 12px);
+    padding: 0.1em 0.3em;
+    margin: 0;
+    max-width: min(80px, 90%);
+    line-height: 1.1;
+}
+
+/* Placeholder trong ô bảng - thích ứng với không gian */
+td .field-placeholder,
+th .field-placeholder {
+    font-size: clamp(8px, 0.8em, inherit);
+    padding: 0.1em 0.25em;
+    margin: 0;
+    display: inline-block;
+    max-width: calc(100% - 0.5em);
+    line-height: 1.1;
+    height: auto;
+}
+
+/* Placeholder trong paragraph của bảng */
+td p .field-placeholder,
+th p .field-placeholder {
+    font-size: clamp(8px, inherit, inherit);
+    padding: 0.1em 0.2em;
+    margin: 0;
+    line-height: inherit;
+}
+
+/* Container queries cho ô bảng hẹp */
+td:has(.field-placeholder) {
+    container-type: inline-size;
+}
+
+@container (max-width: 100px) {
+    td .field-placeholder {
+        font-size: 8px;
+        padding: 0.05em 0.15em;
+        max-width: 95%;
+    }
+}
+
+@container (max-width: 60px) {
+    td .field-placeholder {
+        font-size: 7px;
+        padding: 0.05em 0.1em;
+        max-width: 98%;
+    }
+}
+
+/* ========================================
+   6. MAPPED FIELD SYSTEM - Hệ thống mapped field
+   ======================================== */
+
+/* Base mapped field styling - tương tự field-placeholder */
+.mapped-field {
+    background-color: #cfe2ff;
+    border: 1px dashed #0d6efd;
+    border-radius: 3px;
+    padding: 0.15em 0.4em;
+    margin: 0.05em;
+    color: #074cb3;
+    display: inline-block;
+    white-space: nowrap;
+    user-select: none;
+    font-size: clamp(9px, inherit, 16px);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    line-height: 1.1;
+}
+
+/* Mapped field trong bảng - thích ứng với không gian */
+td .mapped-field,
+th .mapped-field {
+    font-size: clamp(8px, 0.8em, inherit);
+    padding: 0.1em 0.25em;
+    margin: 0;
+    line-height: 1.1;
+    height: auto;
+    max-width: calc(100% - 0.5em);
+}
+
+/* Mapped field trong paragraph của bảng */
+td p .mapped-field,
+th p .mapped-field {
+    font-size: clamp(8px, inherit, inherit);
+    padding: 0.1em 0.2em;
+    margin: 0;
+    line-height: inherit;
+}
+
+/* Container queries cho mapped field trong ô hẹp */
+@container (max-width: 100px) {
+    td .mapped-field {
+        font-size: 8px;
+        padding: 0.05em 0.15em;
+        max-width: 95%;
+    }
+}
+
+@container (max-width: 60px) {
+    td .mapped-field {
+        font-size: 7px;
+        padding: 0.05em 0.1em;
+        max-width: 98%;
+    }
+}
+
+/* ========================================
+   7. FIELD ITEM COMPONENTS - Thành phần field item
+   ======================================== */
+
+/* Container cho field item display */
+.field-item-display {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+/* Thông tin field item */
+.field-item-info {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+/* Text overflow handling cho field info */
+.field-item-info .fw-bold,
+.field-item-info .small {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+/* Field name styling */
+.field-item-name {
+    font-size: 0.85rem;
+}
+
+/* Icon cho data type */
+.field-data-type-icon {
+    font-size: 1.25rem;
+    width: 24px;
+    text-align: center;
+}
+
+/* Button chèn field */
+.insert-field-btn {
+    flex-shrink: 0;
+}
+
+/* ========================================
+   8. UI COMPONENTS - Thành phần giao diện
+   ======================================== */
+
+/* Thông báo hướng dẫn user */
+.mapping-instruction {
+    border-radius: 4px;
+    padding: 8px 0px;
+    margin-bottom: 0px;
+    font-size: 0.875rem;
+    color: #1976d2;
+}
+
+/* Empty placeholder khi không có dữ liệu */
+.empty-placeholder {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    color: #6c757d;
+}

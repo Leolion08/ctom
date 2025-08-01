@@ -1,0 +1,97 @@
+@model CTOM.ViewModels.UserIndexViewModel
+
+@{
+    ViewData["Title"] = "Xóa Người dùng";
+}
+
+<div class="container mt-4">
+    <div class="card col-md-8 mx-auto">
+        <div class="card-header bg-danger text-white">
+            <h3 class="card-title fw-bold">
+                <i class="fas fa-user-times me-2"></i>
+                @ViewData["Title"]
+            </h3>
+        </div>
+        <div class="card-body">
+            <h4 class="text-danger mb-4">Bạn có chắc chắn muốn xóa người dùng này?</h4>
+            
+            <div class="alert alert-warning" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Lưu ý:</strong> Hành động này không thể hoàn tác. Tất cả dữ liệu liên quan đến người dùng này sẽ bị xóa vĩnh viễn.
+            </div>
+
+            <dl class="row">
+                <dt class="col-sm-3 text-end">Tên truy cập</dt>
+                <dd class="col-sm-9">@Model.UserName</dd>
+
+                <dt class="col-sm-3 text-end">Họ và Tên</dt>
+                <dd class="col-sm-9">@Model.TenUser</dd>
+
+                <dt class="col-sm-3 text-end">Phòng ban</dt>
+                <dd class="col-sm-9">@Model.TenPhong</dd>
+                <dt class="col-sm-3 text-end">Trạng thái</dt>
+                <dd class="col-sm-9">
+                    @if (Model.TrangThai == "A")
+                    {
+                        <span class="badge bg-success-subtle">Active</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger-subtle">Disabled</span>
+                    }
+                </dd>
+            </dl>
+
+            <form asp-action="Delete" method="post" class="mt-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Id" />
+                
+                <div class="form-group mb-3">
+                    <label for="confirmText" class="form-label">
+                        Để xác nhận, vui lòng nhập <strong>"@Model.UserName"</strong> vào ô bên dưới:
+                    </label>
+                    <input type="text" id="confirmText" name="confirmText" class="form-control" required 
+                           data-username="@Model.UserName" />
+                </div>
+
+                <div class="d-flex mt-4">
+                    <button type="submit" class="btn btn-danger" id="deleteButton" disabled>
+                        <i class="fas fa-trash-alt me-1"></i> Xác nhận xóa
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary ms-auto">
+                        <i class="fas fa-times me-1"></i> Hủy bỏ
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const confirmText = document.getElementById('confirmText');
+            const deleteButton = document.getElementById('deleteButton');
+            const userName = confirmText.getAttribute('data-username');
+
+            confirmText.addEventListener('input', function() {
+                if (this.value.trim() === userName) {
+                    deleteButton.disabled = false;
+                } else {
+                    deleteButton.disabled = true;
+                }
+            });
+
+            // Xử lý khi form được submit
+            const form = document.querySelector('form');
+            form.addEventListener('submit', function(e) {
+                if (confirmText.value.trim() !== userName) {
+                    e.preventDefault();
+                    alert('Vui lòng nhập chính xác tên đăng nhập để xác nhận xóa.');
+                } else if (!confirm('Bạn có chắc chắn muốn xóa người dùng này? Hành động này không thể hoàn tác.')) {
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
+}

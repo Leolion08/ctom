@@ -1,0 +1,202 @@
+@model CTOM.ViewModels.KhachHangDNViewModel
+
+@{
+    ViewData["Title"] = "Thông tin Khách hàng Doanh nghiệp";
+}
+
+@functions {
+    string DisplayValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "<span class='text-muted fst-italic'>Chưa cập nhật</span>" : value;
+    }
+
+    string DisplayDate(DateTime? date)
+    {
+        return date?.ToString("dd/MM/yyyy") ?? "<span class='text-muted fst-italic'>Chưa cập nhật</span>";
+    }
+}
+
+<h1 class="page-title mb-4">
+    <span class="me-1 text-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building-skyscraper" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M3 21l18 0" />
+            <path d="M5 21v-14l8 -4v18" />
+            <path d="M19 21v-10l-6 -4" />
+            <path d="M9 9l0 .01" />
+            <path d="M9 12l0 .01" />
+            <path d="M9 15l0 .01" />
+            <path d="M9 18l0 .01" />
+        </svg>
+    </span>
+    Thông tin Khách hàng Doanh nghiệp: @Model.TenCif (@Model.SoCif)
+</h1>
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <!-- Thông tin chung -->
+            <h4 class="mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building-store me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M3 21l18 0" />
+                    <path d="M3 7v1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1h-18l2 -4h14l2 4" />
+                    <path d="M5 21l0 -10.15" />
+                    <path d="M19 21l0 -10.15" />
+                    <path d="M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4" />
+                </svg>
+                Thông tin chung
+            </h4>
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4 text-end">Số CIF</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.SoCif))</dd>
+
+                        <dt class="col-sm-4 text-end">Tên khách hàng</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.TenCif))</dd>
+
+                        <dt class="col-sm-4 text-end">Mã số thuế</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.SoGiayChungNhanDKKD))</dd>
+
+                        <dt class="col-sm-4 text-end">Ngày cấp ĐKKD</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayDate(Model.NgayCapGiayChungNhanDKKD))</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4 text-end">Nơi cấp ĐKKD</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.NoiCapGiayChungNhanDKKD))</dd>
+
+                        <dt class="col-sm-4 text-end">Điện thoại</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.SoDienThoaiDN))</dd>
+
+                        <dt class="col-sm-4 text-end">Email</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.EmailCongTy))</dd>
+
+                        <dt class="col-sm-4 text-end">Fax</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.SoFaxCongTy))</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="border-top my-1"></div>
+
+            <!-- Người đại diện theo pháp luật -->
+            <h4 class="mb-3 mt-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-check me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+                    <path d="M6 21v-2a4 4 0 0 1 4 -4h4" />
+                    <path d="M15 19l2 2l4 -4" />
+                </svg>
+                Người đại diện theo pháp luật
+            </h4>
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4 text-end">Họ tên</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.TenNguoiDaiDienTheoPhapLuat))</dd>
+
+                        <dt class="col-sm-4 text-end">Ngày sinh</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayDate(Model.NgaySinhDaiDienCongTy))</dd>
+
+                        <dt class="col-sm-4 text-end">Giới tính</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.GioiTinhDaiDienCongTy))</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4 text-end">Số CMND/CCCD</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.SoGiayToTuyThanDaiDienCongTy))</dd>
+
+                        <dt class="col-sm-4 text-end">Ngày cấp</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayDate(Model.NgayCapGiayToTuyThanDaiDienDN))</dd>
+
+                        <dt class="col-sm-4 text-end">Nơi cấp</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.NoiCapGiayToTuyThanDaiDienDN))</dd>
+
+                        <dt class="col-sm-4 text-end">Địa chỉ thường trú</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.DiaChiDaiDienCongTy))</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="border-top my-1"></div>
+
+            <!-- Kế toán trưởng -->
+            <h4 class="mb-3 mt-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calculator me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M4 3m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+                    <path d="M8 7m0 1a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1z" />
+                    <path d="M8 14l0 .01" />
+                    <path d="M12 14l0 .01" />
+                    <path d="M16 14l0 .01" />
+                    <path d="M8 17l0 .01" />
+                    <path d="M12 17l0 .01" />
+                    <path d="M16 17l0 .01" />
+                </svg>
+                Kế toán trưởng
+            </h4>
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4 text-end">Họ tên</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.TenKeToanTruong))</dd>
+
+                        <dt class="col-sm-4 text-end">Ngày sinh</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayDate(Model.NgaySinhKeToanTruong))</dd>
+
+                        <dt class="col-sm-4 text-end">Giới tính</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.GioiTinhKeToanTruong))</dd>
+
+                        <dt class="col-sm-4 text-end">Địa chỉ thường trú</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.DiaChiKeToanTruong))</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4 text-end">Số CMND/CCCD</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.SoGiayToTuyThanKeToanTruong))</dd>
+
+                        <dt class="col-sm-4 text-end">Ngày cấp</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayDate(Model.NgayCapGiayToTuyThanKeToanTruong))</dd>
+
+                        <dt class="col-sm-4 text-end">Nơi cấp</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.NoiCapGiayToTuyThanKeToanTruong))</dd>
+
+
+
+                        <dt class="col-sm-4 text-end">Số điện thoại</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.SoDienThoaiKeToanTruong))</dd>
+
+                        <dt class="col-sm-4 text-end">Email</dt>
+                        <dd class="col-sm-8">@Html.Raw(DisplayValue(Model.EmailKeToanTruong))</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Nút bấm -->
+            <div class="d-flex justify-content-end mt-4 gap-2 pt-3 border-top">
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-back-up me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M9 14l-4 -4l4 -4" />
+                        <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+                    </svg>
+                    Quay lại danh sách
+                </a>
+                <a asp-action="Edit" asp-route-id="@Model.SoCif" class="btn btn-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-edit me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" />
+                        <path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" />
+                        <path d="M16 5l3 3" />
+                    </svg>
+                    Sửa thông tin
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

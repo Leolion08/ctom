@@ -1,0 +1,847 @@
+@* Bỏ Model PaginatedList vì DataTables sẽ xử lý phân trang *@
+@* @model CTOM.Models.PaginatedList<CTOM.Models.Entities.KhachHangDN> *@
+@using System.Net
+@using Microsoft.Extensions.Options
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@inject IOptions<CTOM.Models.Config.ExcelImportConfig> ExcelImportConfig
+@{
+    ViewData["Title"] = "Danh sách khách hàng doanh nghiệp";
+    var requestToken = Xsrf.GetAndStoreTokens(Context).RequestToken;
+    var maxFileSizeMB = ExcelImportConfig.Value.MaxFileSizeMB;
+    var maxRows = ExcelImportConfig.Value.MaxRows;
+}
+
+@* Khu vực hiển thị thông báo từ ViewData/TempData *@
+<div id="notificationPlaceholder">
+    @if (ViewData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible bg-success-lt" role="alert">
+            @ViewData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (ViewData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-important alert-dismissible bg-yellow-lt" role="alert">
+            @ViewData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+</div>
+
+<!-- Container cho thông báo từ AJAX -->
+<div id="ajaxNotifications" class="position-fixed top-0 end-0 p-3" style="z-index: 1100;"></div>
+
+<div class="card">
+    <div class="card-header" style="background-color: var(--tblr-body-bg);">
+        <h3 class="card-title text-uppercase fw-bold">@ViewData["Title"]</h3>
+        <div class="card-actions">
+            <a asp-action="Create" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M12 5l0 14"></path>
+                    <path d="M5 12l14 0"></path>
+                </svg>
+                Thêm khách hàng mới
+            </a>
+            <button type="button" class="btn btn-success ms-2" data-bs-toggle="modal" data-bs-target="#importModal">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-import" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                    <path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5m-9.5 -2h7m-3 -3l3 3l-3 3" />
+                </svg>
+                Import Excel
+            </button>
+
+        </div>
+    </div>
+
+    <div class="card-body">
+        <!-- Thanh tìm kiếm tùy chỉnh -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <input type="text" id="customSearchInput" class="form-control" placeholder="Tìm theo Số CIF hoặc Tên CIF...">
+                    <button id="customSearchButton" class="btn btn-outline-secondary" type="button">
+                        <i class="ti ti-search me-1"></i>
+                        Tìm
+                    </button>
+                     <button id="clearCustomSearchButton" class="btn btn-outline-secondary" type="button" title="Xóa tìm kiếm">
+                        <i class="ti ti-x"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Container cho bảng dữ liệu -->
+        <div id="khachHangTableContainer">
+            <!-- Partial view giờ chỉ chứa cấu trúc table rỗng -->
+            @await Html.PartialAsync("_KhachHangTable")
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal Xác nhận xóa -->
+<div class="modal modal-blur fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                <i class="ti ti-alert-triangle text-danger" style="font-size: 3rem;"></i>
+                <h3>Xác nhận xóa</h3>
+                <div class="text-muted">
+                    Bạn có chắc chắn muốn xóa khách hàng <span id="modalItemName" class="fw-bold"></span> (Mã: <span id="modalItemId"></span>)?
+                    <div class="mt-3">
+                        <small class="text-danger d-block">Hành động này không thể hoàn tác!</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">
+                                Hủy
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button type="button" id="confirmDeleteButton" class="btn btn-danger w-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M4 7l16 0" />
+                                    <path d="M10 11l0 6" />
+                                    <path d="M14 11l0 6" />
+                                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                                    <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+                                </svg>
+                                Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Import Excel -->
+<div class="modal modal-blur fade" id="importModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import dữ liệu từ Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="importForm" method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="form-group mb-3">
+                        <label class="form-label">Chọn file Excel</label>
+                        <input type="file" class="form-control" name="excelFile" id="excelFile" accept=".xlsx" required
+                               data-max-size="@(maxFileSizeMB * 1024 * 1024)"
+                               data-max-rows="@maxRows">
+                        <small class="text-muted">Hỗ trợ định dạng .xlsx (tối đa @maxFileSizeMB MB và @maxRows.ToString("N0") dòng)</small>
+                        <div class="invalid-feedback" id="fileError"></div>
+                    </div>
+
+                    <!-- Vùng hiển thị Lưu ý -->
+                    <div class="form-text">
+                        <div class="alert alert-info">
+                            <p class="mb-1"><strong>Lưu ý:</strong></p>
+                            <ul class="mb-0">
+                                <li>Sử dụng file mẫu để đảm bảo định dạng dữ liệu chính xác</li>
+                                <li>Dữ liệu tại file này sẽ ghi đè dữ liệu cũ (nếu trùng Số CIF)</li>
+                                <li>Các trường không được để trống: Mã CIF, Tên khách hàng</li>
+                                <li>Định dạng ngày tháng: dd/MM/yyyy</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Vùng hiển thị lỗi chi tiết -->
+
+                    <div id="importGlobalErrorSummary" class="d-flex align-items-center mb-2 d-none"> <i class="ti ti-alert-circle me-2"></i> <span class="error-summary-text fw-semibold"></span> </div>
+
+                    <div id="importErrorDetails" class="alert p-0 d-none">
+                        <div id="errorList" style="max-height: 180px; overflow-y: auto;">
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        <span class="btn-text">Nhận dữ liệu</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_CoreValidationScriptsPartial" />
+    <script src="~/js/validation/khachhangdn/excel-import-validation.js" asp-append-version="true"></script>
+    <script src="~/js/datatable-helper.js" asp-append-version="true"></script>
+
+    <script>
+    // Khai báo biến toàn cục trong một đối tượng namespace để tránh xung đột
+    if (typeof window.ctom === 'undefined') {
+        window.ctom = {};
+    }
+
+    // Khai báo biến DataTable toàn cục để có thể truy cập từ các hàm khác (ví dụ: sau khi xóa)
+    var khachHangDataTable;
+
+    // Ghi đè cách DataTables hiển thị lỗi mặc định
+    // Thay vì hiển thị alert() mặc định của trình duyệt, chúng ta sẽ không làm gì cả (hoặc log ra console)
+    // và để cho error callback trong ajax settings xử lý việc hiển thị lỗi.
+    $.fn.dataTable.ext.errMode = function ( settings, helpPage, message ) {
+        console.error( 'DataTables error: ', message, settings );
+        // Không hiển thị alert mặc định bằng cách không làm gì ở đây,
+        // hoặc return true để báo DataTables rằng lỗi đã được xử lý.
+        // Lỗi sẽ được xử lý trong ajax.error callback.
+        return true;
+    };
+
+    $(document).ready(function() {
+        // Khởi tạo DataTable
+        khachHangDataTable = $('#khachHangTable').DataTable({
+            processing: true, // Hiển thị thông báo "Processing..."
+            serverSide: true, // Kích hoạt server-side processing
+            searching: false,  // Tắt ô tìm kiếm mặc định của DataTables
+            orderMulti: false,
+            order: [[3, "desc"]], // Sắp xếp mặc định theo Ngày cập nhật
+            orderMulti: false, // Chỉ cho phép sắp xếp theo một cột tại một thời điểm
+            ajax: {
+                url: '@Url.Action("GetDataTable", "KhachHangDN")', // Action xử lý AJAX trong KhachHangDNController
+                type: "POST",
+                data: function (d) {
+                    // Gửi token và tham số tìm kiếm dưới dạng form-data
+                    d.__RequestVerificationToken = '@requestToken';
+                    d.q = $('#customSearchInput').val();
+                },
+                error: function (xhr, error, thrown) {
+                    // Xử lý lỗi AJAX nếu có
+                    console.error("Lỗi khi tải dữ liệu DataTables: ", error, thrown, xhr.responseText);
+                    var errorMessage = "Không thể tải dữ liệu. Vui lòng thử lại sau.";
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
+                    } else if (xhr.statusText && xhr.statusText !== "error") {
+                            // Nếu không phải lỗi "error" (thường là do abort request), thì có thể là lỗi server thực sự
+                        errorMessage = `Lỗi server: ${xhr.status} ${xhr.statusText}`;
+                    }
+
+
+                    $('#ajaxNotifications').html(
+                        `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            ${errorMessage}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>`
+                    );
+                        // Ngăn DataTables hiển thị lỗi mặc định của nó và ẩn biểu tượng "processing"
+                    if ($.fn.DataTable.isDataTable('#khachHangTable')) {
+                            $('#khachHangTable_processing').css('display', 'none');
+                    }
+                }
+            },
+            // Cập nhật 'name' và 'data' thành camelCase
+            columns: [
+                {
+                    data: "soCif", name: "soCif"
+                    , title: "Số CIF <i class='ti ti-search ti-xs text-muted ms-1' title='Tìm kiếm theo cột này'></i>"
+                    , className: "text-nowrap text-center"
+                    , width: "10%"
+                }, // 0
+                {
+                    data: "tenCif",
+                    name: "tenCif",
+                    render: function(data, type, row) {
+                        const text = data || '';
+                        return `<div class="text-truncate">${text}</div>`;
+                    }
+                }, // 1
+                {
+                    data: "userThucHienId", name: "userThucHienId", title: "User thực hiện",
+                    className: "text-nowrap text-center",
+                    width: "15%"
+                }, // 2
+                {
+                    data: "ngayCapNhatDuLieu", name: "ngayCapNhatDuLieu"
+                    , className: "text-nowrap text-center"
+                    , title: "Ngày cập nhật", width: "13%",
+                    render: d => formatDateTime(d, 'dd/MM/yyyy HH:mm') //datatable-helper
+                }, // 3
+                {
+                    data: null, // Cột này không có dữ liệu trực tiếp từ model cho DataTables
+                    name: "thaoTac", // Đặt tên cho cột, không dùng để sort
+                    title: "Thao tác",
+                    orderable: false, // Không cho phép sắp xếp cột này
+                    searchable: false, // Không cho phép tìm kiếm trên cột này
+                    //width: "150px", // Điều chỉnh độ rộng nếu cần
+                    // THAY ĐỔI 3: Đặt width và className để ưu tiên hiển thị cột này
+                    width: "200px", // Đặt một giá trị cố định hoặc phần trăm nhỏ
+                    className: "text-nowrap",
+                    render: function (data, type, row, meta) {
+                        // row là đối tượng dữ liệu cho hàng hiện tại (ví dụ: row.soCif, row.tenCif)
+                        // Tạo HTML cho các nút hành động
+                        var detailsUrl = '@Url.Action("Details", "KhachHangDN", new { id = "__id__" })'.replace('__id__', row.soCif);
+                        var editUrl = '@Url.Action("Edit", "KhachHangDN", new { id = "__id__" })'.replace('__id__', row.soCif);
+
+                        // Sử dụng d-flex và gap-1 (hoặc gap-2) để tạo khoảng cách, bỏ btn-group
+                        return `<div class="d-flex gap-1" role="group" aria-label="Thao tác">
+                                    <a href="${detailsUrl}" class="btn btn-sm btn-info" title="Xem chi tiết">
+                                        <i class="ti ti-eye me-1"></i><span class="d-none d-sm-inline">Chi tiết</span>
+                                    </a>
+                                    <a href="${editUrl}" class="btn btn-sm btn-warning" title="Chỉnh sửa">
+                                        <i class="ti ti-edit me-1"></i><span class="d-none d-sm-inline">Sửa</span>
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-danger delete-confirmation-button"
+                                            data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                            data-id="${row.soCif}" data-name="${row.tenCif}"
+                                            title="Xóa">
+                                        <i class="ti ti-trash me-1"></i><span class="d-none d-sm-inline">Xóa</span>
+                                    </button>
+                                </div>`;
+                        }
+                    }
+                ],
+                language: { // Tùy chỉnh ngôn ngữ (giữ nguyên hoặc điều chỉnh)
+                    processing: '<div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Đang tải...</span></div> Đang xử lý...',
+                    lengthMenu: "Hiển thị _MENU_ mục",
+                    zeroRecords: "Không tìm thấy kết quả phù hợp",
+                    info: "Hiển thị từ _START_ đến _END_ của _TOTAL_ mục",
+                    infoEmpty: "Không có dữ liệu",
+                    infoFiltered: "(được lọc từ _MAX_ tổng số mục)",
+                    search: "Tìm kiếm:", // DataTables sẽ tự thêm ô tìm kiếm
+                    paginate: {
+                        first: "Đầu",
+                        last: "Cuối",
+                        next: "Tiếp",
+                        previous: "Trước"
+                    },
+                    emptyTable: "Không có dữ liệu trong bảng"
+                },
+                pageLength: 10, // Số mục hiển thị mặc định mỗi trang
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tất cả"]], // Tùy chọn số mục hiển thị
+                responsive: true, // Cho phép bảng tự điều chỉnh trên các thiết bị khác nhau
+                autoWidth: false, // Tắt tự động tính toán độ rộng cột, có thể set width cho từng cột trong "columns"
+                drawCallback: function(settings) {
+                    // Gọi hàm helper, truyền vào API và chỉ số của các cột cần xử lý
+                    initializeTruncateTooltips(this.api(), [1]); // Cột 1 (Tên CIF)
+                }
+
+            });
+
+        // Xử lý sự kiện click cho nút tìm kiếm tùy chỉnh
+        $('#customSearchButton').on('click', function() {
+            // Lấy giá trị từ ô input tùy chỉnh và áp dụng cho DataTables
+            // DataTables sẽ tự động gọi lại hàm data trong ajax settings
+            // và gửi giá trị search mới này lên server
+            khachHangDataTable.draw(); // Chỉ cần draw() là đủ, DataTables sẽ lấy search value mới
+        });
+
+        // Xử lý sự kiện nhấn Enter trong ô tìm kiếm tùy chỉnh
+        $('#customSearchInput').on('keypress', function(e) {
+            if (e.which == 13) { // 13 là mã phím Enter
+                $('#customSearchButton').click(); // Kích hoạt sự kiện click của nút tìm kiếm
+            }
+        });
+
+        // Xử lý sự kiện click cho nút xóa tìm kiếm tùy chỉnh
+        $('#clearCustomSearchButton').on('click', function() {
+            $('#customSearchInput').val(''); // Xóa giá trị trong ô input
+            khachHangDataTable.search('').draw(); // Xóa tìm kiếm của DataTables và vẽ lại bảng
+        });
+
+        // Gọi hàm khởi tạo modal xóa dùng chung (phiên bản reload datatable)
+         initializeDataTableDeleteModal({
+             modalId: '#deleteConfirmModal',
+                 triggerButtonSelector: '.delete-confirmation-button', // Selector cho các nút kích hoạt modal
+                 confirmButtonId: 'confirmDeleteButton',
+                 nameElementSelector: '#modalItemName',
+                 idElementSelector: '#modalItemId',
+                 dataIdAttribute: 'data-id',
+                 dataNameAttribute: 'data-name',
+                 // xoa va reload lại datatable
+                 //deleteUrlTemplate: '/KhachHangDN/Delete/{id}', // Điều chỉnh URL nếu cần
+                 deleteUrlTemplate: '@Url.Action("Delete", "KhachHangDN")/{id}', // Điều chỉnh URL nếu cần
+                 dataTableInstance: khachHangDataTable, // Truyền instance của DataTable để reload
+                 antiForgeryToken: '@requestToken',
+                 entityName: 'khách hàng doanh nghiệp'
+
+         });
+
+        function clearAllModalNotifications() {
+            $('#importGlobalErrorSummary').addClass('d-none').find('.error-summary-text').empty();
+            $('#importErrorDetails').addClass('d-none').find('#errorList').empty();
+            // Không clear #importStatusMessage ở đây nếu nó dùng cho thông báo chung không phải lỗi chi tiết
+        }
+
+        /**
+         * Hiển thị thông báo thành công trên trang chính (trong #notificationPlaceholder).
+         * param {String} message - Nội dung thông báo thành công.
+         */
+        function displaySuccessOnMainPage(message) {
+            const $tempDataContainer = $('#notificationPlaceholder');
+            if ($tempDataContainer.length === 0) {
+                console.warn('#notificationPlaceholder container not found. Success message will be shown as a global toast.');
+                showGlobalNotification('success', message, 'Thành công');
+                return;
+            }
+
+            // Xóa các thông báo thành công cũ trong #notificationPlaceholder để tránh trùng lặp
+            $tempDataContainer.find('.alert-success').remove();
+
+            const alertId = 'temp-success-alert-' + Date.now();
+            const alertHtml = `
+                <div id="${alertId}" class="alert alert-success alert-dismissible fade show bg-success-lt" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`;
+            const $alert = $(alertHtml);
+            $tempDataContainer.append($alert);
+
+            // Tự động ẩn sau một khoảng thời gian
+            //setTimeout(() => {
+            //    $alert.fadeOut(500, function() { $(this).remove(); });
+            //}, 7000); // 7 giây
+        }
+
+
+        /**
+         * Hiển thị thông báo lỗi chi tiết trong modal import.
+         * param {Array<Object|String>} errorListItems - Mảng các đối tượng lỗi hoặc chuỗi lỗi.
+         * param {String} mainTitlePrefix - Tiền tố cho tiêu đề (ví dụ: 'Lỗi khi import dữ liệu').
+         * param {Number} totalReportedErrors - Tổng số lỗi được báo cáo từ server.
+         * param {String} type - Loại thông báo ('danger' cho lỗi, 'warning' cho cảnh báo).
+         */
+        function showErrorInModal(errorListItems, mainTitlePrefix = 'Lỗi khi import dữ liệu', totalReportedErrors = 0, type = 'danger') {
+            console.log('showErrorInModal called with:', { errorListItems, mainTitlePrefix, totalReportedErrors, type });
+            clearAllModalNotifications();
+
+            const $globalSummaryContainer = $('#importGlobalErrorSummary');
+            const $globalSummaryIcon = $globalSummaryContainer.find('i[class*="ti-"]');
+            const $globalSummaryText = $globalSummaryContainer.find('.error-summary-text');
+
+            const $errorDetailsBox = $('#importErrorDetails');
+            const $errorListElement = $('#errorList');
+            const submitBtn = $('#importForm').find('button[type="submit"]');
+
+
+            const iconType = (type === 'danger' || type === 'error') ? 'danger' : 'warning';
+            const globalIconClass = iconType === 'danger' ? 'ti-alert-circle' : 'ti-alert-triangle';
+            const itemIconClass = globalIconClass;
+            const alertBoxClass = `alert-${iconType}`;
+            const textClassInItem = iconType === 'danger' ? 'text-danger' : 'text-warning';
+
+            if ($globalSummaryIcon.length) {
+                $globalSummaryIcon.attr('class', `ti ${globalIconClass} me-2 text-${iconType}`);
+            }
+
+            if (!Array.isArray(errorListItems) || errorListItems.length === 0) {
+                let clientSideSummaryMessage = mainTitlePrefix;
+                if (errorListItems && errorListItems.length === 1 && typeof errorListItems[0] === 'string') {
+                     $globalSummaryText.html(clientSideSummaryMessage);
+                     $errorListElement.html(`<div class="text-muted p-2">${errorListItems[0]}</div>`);
+                } else {
+                    //clientSideSummaryMessage += ` (Không có chi tiết cụ thể).`;
+                    $globalSummaryText.html(clientSideSummaryMessage);
+                    $errorListElement.html(`<div class="text-muted p-2">${(iconType === 'danger') ? 'Lỗi vượt quá giới hạn cho phép của file.' : 'Không có cảnh báo nào.'}</div>`);
+                }
+                $globalSummaryContainer.removeClass('d-none');
+                $errorDetailsBox.removeClass('alert-success alert-danger alert-warning alert-info d-none').addClass(alertBoxClass);
+
+                if(type === 'warning' || type === 'danger'){
+                    submitBtn.prop('disabled', true).addClass('disabled');
+                }
+
+                if ($globalSummaryContainer[0].scrollIntoView) {
+                    setTimeout(() => { $globalSummaryContainer[0].scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+                }
+                return;
+            }
+
+            const mappedErrors = errorListItems.map(error => {
+                try {
+                    // Nếu error là string, giữ nguyên cách xử lý cũ
+                    if (typeof error === 'string') {
+                        return {
+                            rawMessage: error,
+                            parsedMessage: error,
+                            rowInfo: 'Thông tin chung'
+                        };
+                    }
+
+                    // Xử lý error là object
+                    if (typeof error === 'object' && error !== null) {
+                        const rowNumber = error.rowNumber || 'N/A';
+                        let errorMessage = error.errorMessage || error.message || 'Lỗi không xác định';
+                        let columnName = error.columnName || 'Không xác định';
+
+                        // Tạo thông báo lỗi chi tiết
+                        let displayMessage = errorMessage;
+
+                        // Nếu có thông tin dòng, thêm vào đầu thông báo
+                        if (rowNumber !== 'N/A') {
+                            //displayMessage = `Dòng ${rowNumber}: ${displayMessage}`;
+                        }
+
+                        return {
+                            rawMessage: errorMessage,
+                            parsedMessage: displayMessage,
+                            rowInfo: rowNumber !== 'N/A' ? `Dòng ${rowNumber}` : 'Chi tiết lỗi',
+                            rowNumber: rowNumber,
+                            columnName: columnName,
+                            severity: error.severity || 'Error'
+                        };
+                    }
+
+                    // Trường hợp mặc định
+                    return {
+                        rawMessage: 'Lỗi không xác định',
+                        parsedMessage: 'Đã xảy ra lỗi không xác định',
+                        rowInfo: 'Không xác định'
+                    };
+                } catch (e) {
+                    console.error('Lỗi khi xử lý thông báo lỗi:', e);
+                    return {
+                        rawMessage: 'Lỗi khi xử lý thông báo',
+                        parsedMessage: 'Không thể xử lý thông báo lỗi',
+                        rowInfo: 'Lỗi hệ thống'
+                    };
+                }
+            });
+
+            const actualTotalErrors = totalReportedErrors > 0 ? totalReportedErrors : mappedErrors.length;
+            const maxErrorsToDisplay = 5;
+            const errorsToShowCount = Math.min(mappedErrors.length, maxErrorsToDisplay);
+
+            let summaryTitleText = "";
+            if (actualTotalErrors > 0) {
+                summaryTitleText += `Có ${actualTotalErrors} lỗi khi xử lý file excel. `;
+                if (errorsToShowCount < actualTotalErrors) {
+                    summaryTitleText += `Dưới đây là ${errorsToShowCount}/${actualTotalErrors} lỗi đầu tiên:`;
+                } else {
+                    //summaryTitleText += `Dưới đây là tất cả ${errorsToShowCount} lỗi:`;
+                    summaryTitleText += `Dưới đây là các lỗi:`;
+                }
+            } else {
+                 summaryTitleText += `${mainTitlePrefix} (Không tìm thấy lỗi chi tiết trong danh sách).`;
+            }
+
+            if ($globalSummaryText.length) {
+                $globalSummaryText.html(summaryTitleText);
+            } else {
+                console.warn("Element '.error-summary-text' not found in #importGlobalErrorSummary.");
+            }
+
+            $errorDetailsBox.removeClass('alert-success alert-danger alert-warning alert-info d-none')
+                .addClass(alertBoxClass);
+
+            function renderErrorItemHTML(errorData) {
+                return `
+                    <div class="error-item d-flex align-items-start mb-1 px-2 py-1 border-bottom">
+                        @* <i class="ti ${itemIconClass} mt-1 me-2 ${textClassInItem} error-item-icon"></i> *@
+                        <div class="error-item-content flex-grow-1" style="min-width: 0;">
+                            <span class="fw-semibold small error-item-row">${errorData.rowInfo}:</span>
+                            <span class="text-muted small error-item-message" style="display: inline; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; ">${errorData.parsedMessage}</span>
+                        </div>
+                    </div>`;
+            }
+
+            mappedErrors.slice(0, errorsToShowCount).forEach(err => {
+                $errorListElement.append(renderErrorItemHTML(err));
+            });
+
+            $globalSummaryContainer.removeClass('d-none');
+            $errorDetailsBox.removeClass('d-none');
+
+            submitBtn.prop('disabled', true).addClass('disabled');
+
+
+            if ($globalSummaryContainer[0].scrollIntoView) {
+                setTimeout(() => { $globalSummaryContainer[0].scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+            }
+        }
+
+        function showGlobalNotification(type, message, title = (type === 'danger' ? 'Lỗi' : (type === 'success' ? 'Thành công' : 'Thông báo'))) {
+            const $container = $('#ajaxNotifications');
+            if ($container.length === 0) {
+                console.warn('#ajaxNotifications container not found. Fallback to alert.');
+                alert(`${title}: ${message}`);
+                return;
+            }
+
+            const alertClass = `alert-${type}`;
+            const iconClass = type === 'success' ? 'ti-circle-check' : (type === 'danger' ? 'ti-alert-circle' : (type === 'warning' ? 'ti-alert-triangle' : 'ti-info-circle'));
+            const alertId = 'global-alert-' + Date.now();
+
+            const alertHtml = `
+                <div id="${alertId}" class="alert ${alertClass} alert-dismissible fade show shadow-sm" role="alert" style="min-width: 300px; max-width: 450px;">
+                    <div class="d-flex align-items-start">
+                        <i class="ti ${iconClass} me-3 mt-1 fs-4"></i>
+                        <div class="flex-grow-1">
+                            ${title ? `<h5 class="alert-heading mb-1">${title}</h5>` : ''}
+                            <div class="small">${message}</div>
+                        </div>
+                        <button type="button" class="btn-close ms-2" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                </div>`;
+            const $alert = $(alertHtml);
+            $container.append($alert);
+            setTimeout(() => { $alert.fadeOut(500, function() { $(this).remove(); }); }, 7000);
+        }
+
+        // Hàm reset trạng thái nút submit
+        function resetSubmitButton(submitBtn, btnText, spinner) {
+            if (btnText.length) btnText.text('Nhận dữ liệu');
+            if (spinner.length) spinner.addClass('d-none');
+            submitBtn.prop('disabled', false);
+        }
+
+        // Hàm xử lý lỗi import
+        function handleImportError(response, xhr) {
+            let errorMessage = 'Có lỗi xảy ra khi import dữ liệu';
+            let errors = [];
+
+            try {
+                // Nếu có response từ server
+                if (response) {
+                    errorMessage = response.message || errorMessage;
+
+                    // Xử lý các định dạng lỗi khác nhau
+                    if (response.data?.errors?.length > 0) {
+                        errors = response.data.errors;
+                    } else if (response.errors) {
+                        errors = Array.isArray(response.errors)
+                            ? response.errors
+                            : Object.entries(response.errors).map(([key, val]) => ({
+                                errorMessage: `${key}: ${Array.isArray(val) ? val.join(', ') : val}`,
+                                rowNumber: 'N/A'
+                            }));
+                    } else if (response.detail) {
+                        errors = [{ errorMessage: response.detail, rowNumber: 'N/A' }];
+                    } else if (response.title) {
+                        errors = [{ errorMessage: response.title, rowNumber: 'N/A' }];
+                    }
+                } else if (xhr && xhr.responseText) {
+                    // Thử parse responseText nếu có
+                    try {
+                        const errorResponse = JSON.parse(xhr.responseText);
+                        errors = [{ errorMessage: errorResponse.message || xhr.responseText, rowNumber: 'N/A' }];
+                    } catch {
+                        errors = [{ errorMessage: xhr.responseText, rowNumber: 'N/A' }];
+                    }
+                } else {
+                    errors = [{
+                        errorMessage: `Lỗi không xác định: ${xhr ? xhr.status : 'N/A'} - ${xhr ? (xhr.statusText || 'Không thể kết nối máy chủ') : 'Lỗi không xác định'}`,
+                        rowNumber: 'N/A'
+                    }];
+                }
+            } catch (e) {
+                console.error('Lỗi khi xử lý phản hồi lỗi:', e);
+                errors = [{
+                    errorMessage: `Lỗi hệ thống: ${xhr ? xhr.status : 'N/A'} - ${xhr ? (xhr.statusText || 'Không thể xử lý phản hồi từ máy chủ') : 'Lỗi không xác định'}`,
+                    rowNumber: 'N/A'
+                }];
+            }
+
+            showErrorInModal(errors, errorMessage, errors.length, 'danger');
+        }
+
+        // Xử lý sự kiện submit form import
+        $('#importForm').on('submit', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Bắt đầu xử lý form import...');
+
+            const form = $(this);
+            const formData = new FormData(this);
+            const submitBtn = form.find('button[type="submit"]');
+            const btnText = submitBtn.find('.btn-text');
+            const spinner = submitBtn.find('.spinner-border');
+            const fileInput = form.find('input[type="file"]')[0];
+
+            // Xóa thông báo cũ và hiển thị trạng thái loading
+            clearAllModalNotifications();
+            btnText.text('Đang xử lý...');
+            spinner.removeClass('d-none');
+            submitBtn.prop('disabled', true);
+
+            // Kiểm tra file đã chọn chưa
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showErrorInModal(['Vui lòng chọn file Excel để import.'], 'Chưa chọn file', 1, 'warning');
+                resetSubmitButton(submitBtn, btnText, spinner);
+                return false;
+            }
+
+            const file = fileInput.files[0];
+            const maxSizeMB = @maxFileSizeMB; // Lấy giá trị từ config (đơn vị MB)
+            const maxSizeBytes = maxSizeMB * 1024 * 1024; // Chuyển đổi sang bytes
+
+            // Kiểm tra kích thước file
+            if (file.size > maxSizeBytes) {
+                showErrorInModal(
+                    [`Kích thước file không được vượt quá ${maxSizeMB}MB. File hiện tại: ${(file.size / (1024*1024)).toFixed(4)}MB`],
+                    'File quá lớn',
+                    1,
+                    'warning'
+                );
+                resetSubmitButton(submitBtn, btnText, spinner);
+                return false;
+            }
+
+            // Kiểm tra định dạng file
+            const fileName = file.name.toLowerCase();
+            if (!fileName.endsWith('.xlsx')) {
+                showErrorInModal(
+                    ['Định dạng file không hợp lệ. Vui lòng chọn file Excel (.xlsx).'],
+                    'Sai định dạng file',
+                    1,
+                    'warning'
+                );
+                resetSubmitButton(submitBtn, btnText, spinner);
+                return false;
+            }
+
+            // Đổi tên file input thành 'file' để khớp với tham số trong controller
+            formData.set('file', file);
+
+            // Gửi yêu cầu import
+            $.ajax({
+                url: '@Url.Content("~/api/KhachHangDNImport")', //'/api/KhachHangDNImport',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    console.log('Phản hồi từ server:', response);
+
+                    if (!response) {
+                        handleImportError({ message: 'Không nhận được phản hồi từ máy chủ' }, null);
+                        return;
+                    }
+
+                    // Xử lý lỗi từ server (có thể là lỗi validation hoặc lỗi hệ thống)
+                    if (!response.success && response.data?.errors?.length > 0) {
+                        // Đảm bảo modal đang hiển thị
+                        const $importModal = $('#importModal');
+                        if (!$importModal.hasClass('show')) {
+                            $importModal.modal('show');
+                        }
+
+                        showErrorInModal(
+                            response.data.errors, // Truyền trực tiếp mảng errors từ response
+                            response.data?.message || response.message, // Sử dụng message từ response nếu có
+                            response.data.errors.length,
+                            'error' // Loại thông báo
+                        );
+
+                        resetSubmitButton(submitBtn, btnText, spinner);
+                        return;
+                    }
+
+                    // Xử lý thành công
+                    if (response.success) {
+                        const message = response.message || 'Import dữ liệu thành công!';
+                        displaySuccessOnMainPage(message);
+                        $('#importModal').modal('hide');
+                        //refreshKhachHangTable();
+                        khachHangDataTable.ajax.reload();
+                    } else {
+                        // Xử lý trường hợp success = false nhưng không có lỗi chi tiết
+                        handleImportError(response, null);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    handleImportError(null, xhr);
+                },
+                complete: function() {
+                    if(btnText.length) btnText.text('Nhập dữ liệu');
+                    else submitBtn.text('Nhập dữ liệu');
+                    if(spinner.length) spinner.addClass('d-none');
+                }
+            });
+        });
+
+        $('#importModal').on('show.bs.modal', function () {
+            clearAllModalNotifications();
+            const form = $(this).find('form#importForm');
+            const submitBtn = form.find('button[type="submit"]');
+        });
+
+        // Xử lý sự kiện khi chọn file
+        $('input[type="file"]').on('change', function() {
+            const fileInput = this;
+            const form = $(this).closest('form');
+            const submitBtn = form.find('button[type="submit"]');
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                submitBtn.prop('disabled', true).addClass('disabled');
+                return;
+            }
+
+            // Bật nút submit nếu có file được chọn
+            submitBtn.prop('disabled', false).removeClass('disabled');
+        });
+
+        $('#importModal').on('hidden.bs.modal', function() {
+            clearAllModalNotifications();
+            const form = $(this).find('form#importForm');
+            const submitBtn = form.find('button[type="submit"]');
+            if (form.length) {
+                form[0].reset();
+                submitBtn.prop('disabled', false).removeClass('disabled');
+            }
+            if(form.length){
+                form.find('.is-invalid').removeClass('is-invalid');
+                form.find('.invalid-feedback').remove();
+            }
+        });
+
+        $('#importForm input[type="file"][name="excelFile"]').on('change', function() {
+            const fileInput = $(this)[0];
+            const submitBtn = $('#importForm').find('button[type="submit"]');
+
+            clearAllModalNotifications();
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                submitBtn.prop('disabled', true).addClass('disabled');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const maxSizeMB = @maxFileSizeMB;
+            const fileSizeMB = file.size / (1024 * 1024);
+
+            if (fileSizeMB > maxSizeMB) {
+                showErrorInModal(
+                    [`Kích thước file không được vượt quá ${maxSizeMB}MB. File hiện tại: ${fileSizeMB.toFixed(4)}MB`],
+                    'File quá lớn',
+                    0,
+                    'warning'
+                );
+                fileInput.value = '';
+                return;
+            }
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            if (['xlsx'].indexOf(fileExt) === -1) {
+                 showErrorInModal(
+                    ['Chỉ chấp nhận file Excel có định dạng .xlsx'],
+                    'Sai định dạng file',
+                    0,
+                    'warning'
+                );
+                fileInput.value = '';
+                return;
+            }
+            submitBtn.prop('disabled', false).removeClass('disabled');
+        });
+    });
+</script>
+}
