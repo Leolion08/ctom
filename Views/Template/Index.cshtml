@@ -287,9 +287,11 @@
 
                         if (isOwner) {
                             buttons += ` <button type="button" class="btn btn-sm btn-warning btn-quick-edit" title="Sửa nhanh" data-template-id="${row.templateId}"><i class="ti ti-edit me-1"></i><span class="d-none d-sm-inline">Sửa</span></button>`;
+                            //cho phép owner ánh xạ template (bao gồm ánh xạ lại)
+                            buttons += ` <button type="button" class="btn btn-sm btn-primary btn-mapping" title="Ánh xạ" data-template-id="${row.templateId}"><i class="ti ti-link me-1"></i><span class="d-none d-sm-inline">Ánh xạ</span></button>`;
 
                             if (row.status?.toLowerCase() === 'draft') {
-                                buttons += ` <button type="button" class="btn btn-sm btn-primary btn-mapping" title="Ánh xạ" data-template-id="${row.templateId}"><i class="ti ti-link me-1"></i><span class="d-none d-sm-inline">Ánh xạ</span></button>`;
+                                //buttons += ` <button type="button" class="btn btn-sm btn-primary btn-mapping" title="Ánh xạ" data-template-id="${row.templateId}"><i class="ti ti-link me-1"></i><span class="d-none d-sm-inline">Ánh xạ</span></button>`;
                                 buttons += ` <button type="button" class="btn btn-sm btn-danger delete-confirmation-button" title="Xóa" data-id="${row.templateId}" data-name="${row.templateName}"><i class="ti ti-trash me-1"></i><span class="d-none d-sm-inline">Xóa</span></button>`;
                             }
                         }

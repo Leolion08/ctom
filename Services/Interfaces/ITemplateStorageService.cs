@@ -55,5 +55,16 @@ namespace CTOM.Services.Interfaces
         /// <param name="relativePath">Đường dẫn tương đối của file.</param>
         /// <returns>Nội dung file dưới dạng byte array, hoặc null nếu có lỗi.</returns>
         Task<byte[]?> GetFileBytesAsync(string relativePath);
+
+        /// <summary>
+        /// (MỚI) Lưu file DOCX đã được điền placeholder (mapped).
+        /// Phương thức này sẽ tự quản lý đường dẫn lưu file dựa trên ID của template.
+        /// </summary>
+        /// <param name="templateId">ID của template.</param>
+        /// <param name="fileContent">Nội dung file dưới dạng byte array.</param>
+        /// <param name="userName">Tên người dùng của chủ sở hữu template.</param>
+        /// <param name="businessOperationId">ID của nghiệp vụ.</param>
+        /// <returns>Đường dẫn tương đối đến file đã lưu.</returns>
+        Task<string> SaveMappedFileAsync(int templateId, byte[] fileContent, string userName, int businessOperationId);
     }
 }

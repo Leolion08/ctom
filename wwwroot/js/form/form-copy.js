@@ -7,11 +7,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     const utils = window.CTOM.formUtils;
-    const baseUrl = window.appBaseUrl || '/'; // fallback nếu chưa được gán
+    const baseUrl = window.appBaseUrl || '/';
 
     // --- KHAI BÁO BIẾN VÀ DOM ELEMENTS ---
     const copyForm = document.getElementById('copyForm');
-    const htmlPreview = document.getElementById('html-preview');
     const dynamicFieldsContainer = document.getElementById('dynamicFieldsContainer');
 
     const templateId = window.templateId;
@@ -28,20 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const fields = await res.json();
 
             // 2. Render các trường và điền dữ liệu đã sao chép
+            // Hàm này trong form-common.js đã tự động gắn các event listener cần thiết
             utils.renderDynamicFields(fields, dynamicFieldsContainer, initialFormData);
 
-            // 3. Cập nhật preview với dữ liệu ban đầu
-            if (htmlPreview) {
-                // Lặp qua dữ liệu và điền vào các placeholder đã được render sẵn
-                for (const [key, val] of Object.entries(initialFormData)) {
-                    if (val !== null && val !== undefined) {
-                        const fieldInfo = fields.find(f => f.fieldName === key);
-                        utils.updatePreviewField(key, val.toString(), fieldInfo?.dataType);
-                    }
-                }
-            }
-
-            // 4. Điều chỉnh giao diện
+            // 3. Điều chỉnh giao diện
             setTimeout(() => {
                 utils.setPreviewHeight();
                 utils.fitHtmlToPane();
@@ -58,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- GẮN KẾT SỰ KIỆN ---
 
-    // Xử lý submit form (giống logic của form-create.js)
+    // Xử lý submit form (logic giống hệt form-create.js)
     copyForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -75,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const currentFields = utils.getCurrentFields();
         const missingFields = currentFields
+            .filter(field => field.isRequired) // Chỉ kiểm tra các trường bắt buộc
             .map(field => {
                 const input = copyForm.querySelector(`[name="FormValues[${field.fieldName}]"]`);
                 return (input && !input.value.trim()) ? field.displayName : null;
@@ -83,18 +73,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let userConfirmed = false;
         if (missingFields.length > 0) {
-            userConfirmed = await utils.showConfirmation({
-                title: 'Cảnh báo',
-                message: `<p>Các trường sau chưa được nhập dữ liệu:</p><ul class="missing-fields-list">${missingFields.map(name => `<li>${name}</li>`).join('')}</ul><p class="mt-3">Bạn chắc chắn muốn lưu dữ liệu này?</p>`,
-                status: 'bg-warning', icon: 'ti ti-alert-triangle text-warning',
-                confirmText: 'Lưu', confirmIcon: 'ti ti-check', confirmBtnClass: 'btn btn-warning w-100',
-                cancelText: 'Hủy', cancelIcon: 'ti ti-x', cancelBtnClass: 'btn btn-secondary w-100'
+             await utils.showConfirmation({
+                title: 'Dữ liệu không hợp lệ',
+                message: `<p>Các trường bắt buộc sau chưa được nhập dữ liệu:</p><ul class="missing-fields-list">${missingFields.map(name => `<li>${name}</li>`).join('')}</ul>`,
+                showCancel: false, status: 'bg-warning', icon: 'ti ti-alert-triangle text-warning',
+                confirmText: 'Đã hiểu', confirmIcon: 'ti ti-check', confirmBtnClass: 'btn btn-warning w-100'
             });
+            return; // Dừng lại nếu thiếu trường bắt buộc
         } else {
             userConfirmed = await utils.showConfirmation({
                 title: 'Xác nhận lưu',
-                message: 'Bạn chắc chắn muốn lưu các thay đổi này?',
-                status: 'bg-primary', icon: 'ti ti-alert-triangle text-primary',
+                message: 'Bạn chắc chắn muốn tạo một giao dịch mới với các thông tin này?',
+                status: 'bg-primary', icon: 'ti ti-help-circle text-primary',
                 confirmText: 'Lưu', confirmIcon: 'ti ti-check', confirmBtnClass: 'btn btn-primary w-100',
                 cancelText: 'Hủy', cancelIcon: 'ti ti-x', cancelBtnClass: 'btn btn-secondary w-100'
             });

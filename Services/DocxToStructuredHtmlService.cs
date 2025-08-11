@@ -11,6 +11,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions; // Thêm thư viện Regex để sử dụng
+using System.Security.Cryptography; // [SỬA ĐỔI] Thêm using cho việc hash
 
 namespace CTOM.Services;
 
@@ -262,13 +263,16 @@ public class DocxToStructuredHtmlService
         }
     }
 
-    // SỬA ĐỔI: Sử dụng maxTableNestingLevel để xác định data-mappable.
+    // SỬA ĐỔI: Sử dụng maxTableNestingLevel để xác định data-mappable, thêm data-paragraph-hash
         private void ProcessParagraphWithPath(Paragraph p, MainDocumentPart mainPart, StringBuilder htmlBuilder, string docxPath, int maxTableNestingLevel, bool isViewMode)
     {
         var paragraphId = GenerateUniqueElementId("p");
         _elementIdMap[docxPath] = paragraphId;
 
         string paragraphStyle = ParseParagraphProperties(p.ParagraphProperties, mainPart);
+        // [SỬA ĐỔI] Tính hash nội dung của paragraph để làm định danh bền vững
+        var paragraphTextContent = p.InnerText;
+        var paragraphHash = ComputeSha256Hash(paragraphTextContent);
 
         bool hasNumberingBullet = false;
         string numberingBullet = "";
@@ -297,7 +301,9 @@ public class DocxToStructuredHtmlService
             var maxAllowedDepth = maxTableNestingLevel + 1;
             string mappableAttr = (_nestedTableDepth <= maxAllowedDepth) ? "true" : "false";
 
+            // [SỬA ĐỔI] Thêm data-paragraph-hash vào thẻ p
             htmlBuilder.Append($"<p data-mappable=\"{mappableAttr}\" data-element-id=\"{paragraphId}\" " +
+                              $"data-paragraph-hash=\"{paragraphHash}\" " + // Thêm thuộc tính hash
                               $"data-type=\"paragraph\" data-docx-path=\"{docxPath}\" " +
                               $"data-nested-depth=\"{_nestedTableDepth}\" style='{paragraphStyle}'>");
         }
@@ -1377,11 +1383,7 @@ public class DocxToStructuredHtmlService
 
         return string.Join("; ", styles);
     }
-    /**
-     * PHẦN THAY ĐỔI: Viết lại hoàn toàn logic để đơn giản hóa và sửa lỗi.
-     * Server sẽ tạo ra các span tương tác cuối cùng.
-     * Client JS sẽ không cần phải tạo lại span nữa.
-     */
+
     /// <summary>
     /// Highlights placeholders in the format <<placeholder>> with CSS class for visual distinction
     /// </summary>
@@ -1393,22 +1395,39 @@ public class DocxToStructuredHtmlService
         if (string.IsNullOrEmpty(text))
             return "";
 
-        // First, encode the entire text to handle special characters like <, > in the normal text.
-        string encodedText = WebUtility.HtmlEncode(text);
+        // Đối với chế độ chỉ xem, chúng ta không cần các span tương tác, chỉ cần hiển thị text.
+        if (isViewMode)
+        {
+            return WebUtility.HtmlEncode(text);
+        }
+        
+        // Đối với chế độ mapping, tạo các span tương tác ở phía server theo đúng ý đồ thiết kế ban đầu.
+        // Điều này khắc phục lỗi placeholder không hiển thị đúng.
+        var placeholderRegex = new Regex(@"(<<[a-zA-Z0-9_]+>>)");
+        
+        // Tách chuỗi text bởi các placeholder, nhưng vẫn giữ lại các placeholder trong kết quả.
+        var parts = placeholderRegex.Split(text);
+        var sb = new StringBuilder();
 
-        // Now, find the encoded placeholders (&lt;&lt;FieldName&gt;&gt;) and replace them back with the desired HTML span.
-        // This is safer because we are not trying to parse HTML with regex.
-        string finalHtml = Regex.Replace(encodedText,
-            @"&lt;&lt;([^&]+)&gt;&gt;", // Matches the encoded placeholder
-            match => {
-                string fieldName = match.Groups[1].Value;
-                // The placeholder text itself (e.g., "<<FieldName>>") is already encoded from the first step.
-                string encodedPlaceholderText = match.Value;
-                return $"<span class=\"placeholder-span placeholder-empty\" data-placeholder-for=\"{fieldName}\">{encodedPlaceholderText}</span>";
-            },
-            RegexOptions.IgnoreCase);
-
-        return finalHtml;
+        foreach (var part in parts)
+        {
+            if (placeholderRegex.IsMatch(part))
+            {
+                // Phần này là một placeholder, ví dụ: "<<FieldName>>"
+                string fieldName = part.Trim('<', '>');
+                
+                // Tạo thẻ span cuối cùng. Nội dung của thẻ span là chính chuỗi placeholder,
+                // nhưng được mã hóa HTML để hiển thị chính xác và an toàn.
+                // Ví dụ: <span ...>&lt;&lt;FieldName&gt;&gt;</span>
+                sb.Append($"<span class=\"field-placeholder\" contenteditable=\"false\" data-field-name=\"{fieldName}\">{WebUtility.HtmlEncode(part)}</span>");
+            }
+            else
+            {
+                // Phần này là text thông thường, chỉ cần mã hóa HTML.
+                sb.Append(WebUtility.HtmlEncode(part));
+            }
+        }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -1494,5 +1513,25 @@ public class DocxToStructuredHtmlService
 
         // If not recognized as a bullet symbol, return as-is (could be custom text)
         return bulletText;
+    }
+
+    // [SỬA ĐỔI] Thêm hàm helper để tính SHA256
+    private static string ComputeSha256Hash(string rawData)
+    {
+        if (string.IsNullOrEmpty(rawData))
+        {
+            return string.Empty;
+        }
+        
+        using (SHA256 sha256Hash = SHA256.Create())
+        {
+            byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+            var builder = new StringBuilder();
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                builder.Append(bytes[i].ToString("x2"));
+            }
+            return builder.ToString();
+        }
     }
 }

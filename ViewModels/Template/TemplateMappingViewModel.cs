@@ -1,102 +1,29 @@
+// File: ViewModels/Template/TemplateMappingViewModel.cs
+// Ghi chú: File này chứa các DTOs dùng để giao tiếp giữa client và server.
+
+#nullable enable
+
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+
 namespace CTOM.ViewModels.Template
 {
     /// <summary>
-    /// ViewModel chính cho trang Mapping, chứa nội dung HTML đã được xử lý.
+    /// ViewModel chính cho trang Mapping.
+    /// [SỬA ĐỔI] Thêm MappedFieldsJson để truyền dữ liệu mapping đã lưu.
     /// </summary>
     public class TemplateMappingViewModel
     {
         public int TemplateId { get; set; }
-        public string TemplateName { get; set; }= string.Empty;
-        public List<FieldViewModel> AvailableFields { get; set; }= []; //new();
-
+        public string TemplateName { get; set; } = string.Empty;
+        public List<FieldViewModel> AvailableFields { get; set; } = [];
+        public string StructuredHtmlContent { get; set; } = string.Empty;
+        
         /// <summary>
-        /// Nội dung HTML của file DOCX đã được phân tích và nhúng metadata.
-        /// Client sẽ render trực tiếp nội dung này.
+        /// [SỬA ĐỔI] Chuỗi JSON chứa danh sách các trường đã được ánh xạ (FieldMappingInfo).
+        /// Dùng để khởi tạo lại giao diện mapping một cách bền vững.
         /// </summary>
-        public string StructuredHtmlContent { get; set; }= string.Empty;
-    }
-
-    public class FieldViewModel
-    {
-        public string Name { get; set; }= string.Empty;
-        public string DisplayName { get; set; }= string.Empty;
-        // --- BỔ SUNG ---
-        public string DataType { get; set; } = "TEXT"; // Thêm thuộc tính này
-        public string DataSourceType { get; set; } = "CIF";
-        public int DisplayOrder { get; set; } = 0;
-        // --- HẾT BỔ SUNG ---
-    }
-
-    /// <summary>
-    /// DTO (Data Transfer Object) được gửi từ client khi nhấn nút "Lưu".
-    /// </summary>
-    public class SaveMappingRequest
-    {
-        public int TemplateId { get; set; }
-        public List<FieldMappingInfo> Fields { get; set; }= []; //new();
-    }
-
-    /// <summary>
-    /// Thông tin mapping cho một trường dữ liệu cụ thể.
-    /// </summary>
-    public class FieldMappingInfo
-    {
-        public string FieldName { get; set; }= string.Empty;
-        //Bổ sung giống TemplateField
-        public string? DisplayName { get; set; }
-        public string? DataType { get; set; } = "text";
-        public string? DefaultValue { get; set; }
-        public bool IsRequired { get; set; }= false;
-        public int? DisplayOrder { get; set; }= 0;
-        public string? Description { get; set; }
-        public string? DataSourceType { get; set; }
-        public string? CalculationFormula { get; set; }
-        //Bổ sung - END
-        public List<FieldPosition> Positions { get; set; }= []; //new();
-    }
-
-    /// <summary>
-    /// Định nghĩa vị trí chèn placeholder theo cấu trúc của DOCX.
-    /// Thay thế hoàn toàn cho XPath.
-    /// </summary>
-    public class FieldPosition
-    {
-        /// <summary>
-        /// Chỉ số của Paragraph (w:p) trong tài liệu, bắt đầu từ 0.
-        /// </summary>
-        public int ParagraphId { get; set; }= 0;
-
-        /// <summary>
-        /// Chỉ số của Run (w:r) chứa text trong Paragraph, bắt đầu từ 0.
-        /// </summary>
-        public int RunId { get; set; }= 0;
-
-        /// <summary>
-        /// Vị trí của ký tự (offset) trong Run để chèn placeholder.
-        /// </summary>
-        public int CharOffset { get; set; }= 0;
-
-        /// <summary>
-        /// ID duy nhất của element (được sinh bởi DocxToStructuredHtmlService)
-        /// </summary>
-        public string? ElementId { get; set; }
-
-        /// <summary>
-        /// Đường dẫn DOCX của element (backup cho debugging)
-        /// </summary>
-        public string? DocxPath { get; set; }
-
-        /// <summary>
-        /// Có phải đang nằm trong bảng con (nested table) không
-        /// </summary>
-        public bool IsInNestedTable { get; set; } = false;
-
-        /// <summary>
-        /// Độ sâu của nested table (0 = không trong table, 1 = table cha, 2+ = table con)
-        /// </summary>
-        public int NestedDepth { get; set; } = 0;
+        public string MappedFieldsJson { get; set; } = "[]";
     }
 
     /// <summary>
@@ -139,5 +66,83 @@ namespace CTOM.ViewModels.Template
         /// Công thức tính toán cho trường loại CALC
         /// </summary>
         public string? CalculationFormula { get; set; }
+    }
+
+    public class FieldViewModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string DataType { get; set; } = "TEXT";
+        public string DataSourceType { get; set; } = "CIF";
+        public int DisplayOrder { get; set; } = 0;
+    }
+
+    /// <summary>
+    /// [SỬA ĐỔI] DTO chính được gửi từ client khi nhấn nút "Lưu".
+    /// </summary>
+    public class SaveMappingRequest
+    {
+        public int TemplateId { get; set; }
+        public List<FieldMappingInfo> Fields { get; set; } = [];
+    }
+
+    /// <summary>
+    /// [SỬA ĐỔI] Chứa thông tin đầy đủ của một trường được mapping, bao gồm danh sách các "Dấu vân tay" vị trí.
+    /// </summary>
+    public class FieldMappingInfo
+    {
+        public string FieldName { get; set; } = string.Empty;
+        public string? DisplayName { get; set; }
+        public string? DataType { get; set; } = "text";
+        public string? DefaultValue { get; set; }
+        public bool IsRequired { get; set; }
+        public int? DisplayOrder { get; set; }
+        public string? Description { get; set; }
+        public string? DataSourceType { get; set; }
+        public string? CalculationFormula { get; set; }
+        public List<FieldPositionFingerprint> Positions { get; set; } = [];
+    }
+
+    /// <summary>
+    /// [SỬA ĐỔI] Định nghĩa cấu trúc "Dấu vân tay" (Fingerprint) để định vị placeholder.
+    /// Đây là cấu trúc cốt lõi của giải pháp, đảm bảo việc lưu và tải lại mapping luôn chính xác.
+    /// </summary>
+    public class FieldPositionFingerprint
+    {
+        /// <summary>
+        /// [Anker Chính] Hash SHA256 của toàn bộ nội dung text trong Paragraph chứa placeholder.
+        /// Giúp tìm lại đúng đoạn văn một cách đáng tin cậy.
+        /// </summary>
+        [Required]
+        public string ParagraphHash { get; set; } = string.Empty;
+
+        /// <summary>
+        /// [Anker Phụ] Một đoạn văn bản ngắn (khoảng 20 ký tự) ngay TRƯỚC vị trí con trỏ.
+        /// Dùng để định vị chính xác điểm chèn bên trong một đoạn văn.
+        /// </summary>
+        public string ContextBeforeText { get; set; } = string.Empty;
+
+        /// <summary>
+        /// [Anker Phụ] Một đoạn văn bản ngắn (khoảng 20 ký tự) ngay SAU vị trí con trỏ.
+        /// Kết hợp với ContextBeforeText để tạo ra một "khung" định vị duy nhất.
+        /// </summary>
+        public string ContextAfterText { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Vị trí của ký tự (offset) tương đối bên trong thẻ <span> (run) chứa điểm chèn.
+        /// </summary>
+        public int CharOffsetInRun { get; set; }
+
+        /// <summary>
+        /// [Dự phòng] Đường dẫn cấu trúc do server tạo ra (ví dụ: "body.p[5].r[2]").
+        /// Được sử dụng như phương án cuối cùng nếu các anker chính thất bại.
+        /// </summary>
+        public string StructuralPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// [THÊM MỚI] Lưu độ sâu của bảng lồng nhau (0 = không trong bảng, 1 = bảng cha, 2+ = bảng con).
+        /// Thông tin này được lấy từ thuộc tính `data-nested-depth` ở client.
+        /// </summary>
+        public int NestedDepth { get; set; } = 0;
     }
 }

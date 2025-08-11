@@ -22,6 +22,17 @@
 <div class="page-body">
     <div class="container-xl">
         <!-- Cấu trúc layout 2 cột đồng nhất -->
+        @if (ViewData["ShowTemplateVersionWarning"] as bool? == true)
+        {
+            <div class="alert alert-warning" role="alert">
+                <h4 class="alert-title"><i class="ti ti-alert-triangle me-2"></i>Cảnh báo</h4>
+                <div>
+                    Template của biểu mẫu này đã có thay đổi sau khi giao dịch này được tạo. Một số trường dữ liệu có thể đã lỗi thời. Vui lòng kiểm tra kỹ trước khi sử dụng.
+                </div>
+                <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+            </div>
+        }
+
         <div class="main-layout two-column">
             <!-- CỘT TRÁI: FORM CHỈ XEM -->
             <div class="form-input-area">

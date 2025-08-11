@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography; // [THÊM MỚI] Dùng cho việc hash
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq.Dynamic.Core;
@@ -380,12 +381,13 @@ namespace CTOM.Controllers
             }
         }
 
-        // SỬA ĐỔI: Truyền MaxTableNestingLevel khi chuyển đổi DOCX sang HTML.
+        // [SỬA ĐỔI] Viết lại hoàn toàn Action Details để thống nhất logic hiển thị với trang Mapping
         [HttpGet("Details/{id}")]
         public async Task<IActionResult> Details(int id)
         {
             var template = await _context.Templates
                 .Include(t => t.BusinessOperation)
+                .Include(t => t.TemplateFields)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.TemplateID == id);
 
@@ -394,56 +396,66 @@ namespace CTOM.Controllers
                 return NotFound($"Không tìm thấy template có ID: {id}");
             }
 
-            // Quyết định file sẽ hiển thị và convert sang HTML
             string? htmlContent = null;
             bool hasFile = false;
+            string mappedFieldsJson = "[]";
+            string? relativePathToLoad = template.OriginalDocxFilePath;
 
             try
             {
-                string? relativeFilePath = null;
-                if (template.Status?.Equals("Mapped", StringComparison.OrdinalIgnoreCase) == true &&
-                    !string.IsNullOrEmpty(template.MappedDocxFilePath))
+                if (!string.IsNullOrEmpty(relativePathToLoad))
                 {
-                    relativeFilePath = template.MappedDocxFilePath;
-                }
-                else if (!string.IsNullOrEmpty(template.OriginalDocxFilePath))
-                {
-                    relativeFilePath = template.OriginalDocxFilePath;
-                }
+                    var originalDocxBytes = await _templateStorageService.GetFileBytesAsync(relativePathToLoad);
 
-                if (!string.IsNullOrEmpty(relativeFilePath))
-                {
-                    // SỬA ĐỔI: Gọi service để đọc file an toàn
-                    var docxBytes = await _templateStorageService.GetFileBytesAsync(relativeFilePath);
-
-                    if (docxBytes != null)
+                    if (originalDocxBytes != null)
                     {
-                        htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: true);
+                        htmlContent = _docxToHtmlService.ConvertToHtml(originalDocxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: false);
                         hasFile = true;
-                        _logger.LogInformation("Successfully converted DOCX to HTML for template {TemplateId}", id);
+                        _logger.LogInformation("Đã chuyển đổi original DOCX sang HTML thành công cho template {TemplateId}", id);
+
+                        if (template.Status?.Equals("Mapped", StringComparison.OrdinalIgnoreCase) == true && 
+                            template.TemplateFields != null &&
+                            template.TemplateFields.Any(f => !string.IsNullOrEmpty(f.MappingPositionsJson)))
+                        {
+                            var mappedFieldsData = template.TemplateFields
+                                .Where(f => !string.IsNullOrEmpty(f.MappingPositionsJson))
+                                .Select(f => new FieldMappingInfo
+                                {
+                                    FieldName = f.FieldName,
+                                    DisplayName = f.DisplayName,
+                                    Positions = JsonConvert.DeserializeObject<List<FieldPositionFingerprint>>(f.MappingPositionsJson!) ?? new List<FieldPositionFingerprint>()
+                                })
+                                .Where(fm => fm.Positions.Count > 0)
+                                .ToList();
+                            
+                            // [SỬA LỖI] Sử dụng CamelCaseResolver để đảm bảo JSON nhất quán với client
+                            var serializerSettings = new JsonSerializerSettings
+                            {
+                                ContractResolver = new CamelCasePropertyNamesContractResolver()
+                            };
+                            mappedFieldsJson = JsonConvert.SerializeObject(mappedFieldsData, serializerSettings);
+                        }
                     }
                     else
                     {
-                        _logger.LogWarning("Không thể đọc file template: {FilePath}", relativeFilePath);
+                        _logger.LogWarning("Không thể đọc file template: {FilePath}", relativePathToLoad);
                         htmlContent = "<p class='text-red-500 font-bold'>Lỗi: Không thể đọc file template. File có thể không tồn tại hoặc đang bị khóa.</p>";
-                        hasFile = false;
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error converting DOCX to HTML for template {TemplateId}", id);
-                // htmlContent = null;
+                _logger.LogError(ex, "Lỗi khi chuyển đổi DOCX sang HTML cho template {TemplateId}", id);
                 htmlContent = "<p class='text-red-500 font-bold'>Lỗi nghiêm trọng khi chuyển đổi file sang HTML.</p>";
             }
 
-            // Chỉ người tạo template mới được phép ánh xạ
             var isOwner = string.Equals(template.CreatedByUserName, _currentUser.UserName, StringComparison.OrdinalIgnoreCase);
-            var canMapping = isOwner && !string.Equals(template.Status, "Mapped", StringComparison.OrdinalIgnoreCase);
+            var canMapping = isOwner;
 
             var viewModel = new TemplateDetailsVM
             {
                 TemplateId = template.TemplateID,
+                //TemplateCode = template.TemplateID.ToString(),
                 BusinessOperationName = template.BusinessOperation?.OperationName,
                 TemplateName = template.TemplateName,
                 Description = template.Description,
@@ -456,11 +468,95 @@ namespace CTOM.Controllers
                 CreationTimestamp = template.CreationTimestamp,
                 LastModificationTimestamp = template.LastModificationTimestamp,
                 LastModifiedByUserName = template.LastModifiedByUserName,
-                CanMapping = canMapping
+                CanMapping = canMapping,
+                MappedFieldsJson = mappedFieldsJson
             };
 
             return View(viewModel);
         }
+
+        // // SỬA ĐỔI: Truyền MaxTableNestingLevel khi chuyển đổi DOCX sang HTML.
+        // [HttpGet("Details/{id}")]
+        // public async Task<IActionResult> Details(int id)
+        // {
+        //     var template = await _context.Templates
+        //         .Include(t => t.BusinessOperation)
+        //         .AsNoTracking()
+        //         .FirstOrDefaultAsync(t => t.TemplateID == id);
+
+        //     if (template is null)
+        //     {
+        //         return NotFound($"Không tìm thấy template có ID: {id}");
+        //     }
+
+        //     // Quyết định file sẽ hiển thị và convert sang HTML
+        //     string? htmlContent = null;
+        //     bool hasFile = false;
+
+        //     try
+        //     {
+        //         string? relativeFilePath = null;
+        //         if (template.Status?.Equals("Mapped", StringComparison.OrdinalIgnoreCase) == true &&
+        //             !string.IsNullOrEmpty(template.MappedDocxFilePath))
+        //         {
+        //             relativeFilePath = template.MappedDocxFilePath;
+        //         }
+        //         else if (!string.IsNullOrEmpty(template.OriginalDocxFilePath))
+        //         {
+        //             relativeFilePath = template.OriginalDocxFilePath;
+        //         }
+
+        //         if (!string.IsNullOrEmpty(relativeFilePath))
+        //         {
+        //             // SỬA ĐỔI: Gọi service để đọc file an toàn
+        //             var docxBytes = await _templateStorageService.GetFileBytesAsync(relativeFilePath);
+
+        //             if (docxBytes != null)
+        //             {
+        //                 htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: true);
+        //                 hasFile = true;
+        //                 _logger.LogInformation("Successfully converted DOCX to HTML for template {TemplateId}", id);
+        //             }
+        //             else
+        //             {
+        //                 _logger.LogWarning("Không thể đọc file template: {FilePath}", relativeFilePath);
+        //                 htmlContent = "<p class='text-red-500 font-bold'>Lỗi: Không thể đọc file template. File có thể không tồn tại hoặc đang bị khóa.</p>";
+        //                 hasFile = false;
+        //             }
+        //         }
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         _logger.LogError(ex, "Error converting DOCX to HTML for template {TemplateId}", id);
+        //         // htmlContent = null;
+        //         htmlContent = "<p class='text-red-500 font-bold'>Lỗi nghiêm trọng khi chuyển đổi file sang HTML.</p>";
+        //     }
+
+        //     // Chỉ người tạo template mới được phép ánh xạ
+        //     var isOwner = string.Equals(template.CreatedByUserName, _currentUser.UserName, StringComparison.OrdinalIgnoreCase);
+        //     //var canMapping = isOwner && !string.Equals(template.Status, "Mapped", StringComparison.OrdinalIgnoreCase);
+        //     var canMapping = isOwner; // Cho phép người tạo template ánh xạ (bao gồm cả template đã ánh xạ)
+
+        //     var viewModel = new TemplateDetailsVM
+        //     {
+        //         TemplateId = template.TemplateID,
+        //         BusinessOperationName = template.BusinessOperation?.OperationName,
+        //         TemplateName = template.TemplateName,
+        //         Description = template.Description,
+        //         Status = template.Status ?? "Draft",
+        //         IsActive = template.IsActive,
+        //         HtmlContent = htmlContent,
+        //         HasFile = hasFile,
+        //         CreatedByUserName = template.CreatedByUserName,
+        //         CreatedDepartmentID = template.CreatedDepartmentID,
+        //         CreationTimestamp = template.CreationTimestamp,
+        //         LastModificationTimestamp = template.LastModificationTimestamp,
+        //         LastModifiedByUserName = template.LastModifiedByUserName,
+        //         CanMapping = canMapping
+        //     };
+
+        //     return View(viewModel);
+        // }
 
 
         [HttpPost("Delete/{id}"), ActionName("Delete")]
@@ -657,125 +753,123 @@ namespace CTOM.Controllers
         {
             if (template == null) return false;
             var isOwner = string.Equals(template.CreatedByUserName, _currentUser.UserName, StringComparison.OrdinalIgnoreCase);
-            return isOwner && !string.Equals(template.Status, "Mapped", StringComparison.OrdinalIgnoreCase);
+            //return isOwner && !string.Equals(template.Status, "Mapped", StringComparison.OrdinalIgnoreCase);
+
+            // SỬA ĐỔI THEO PRD: Bỏ kiểm tra status "Mapped" để cho phép chỉnh sửa lại.
+            return isOwner;
         }
 
-        /// <summary>
-        /// Yêu cầu GET bất hợp lệ sẽ chuyển hướng kèm thông báo lỗi.
-        /// </summary>
-        [HttpGet("Mapping/{id}")]
-        public IActionResult MappingGet(int id)
-        {
-            TempData["ErrorMessage"] = "Bạn không có quyền truy cập hoặc phương thức không hợp lệ.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        /// <summary>
-        /// Hiển thị trang mapping cho template, đã được viết lại theo Giải pháp 2.
-        /// </summary>
+        // [SỬA ĐỔI] Hợp nhất logic của MappingGet và Mapping (POST) vào một phương thức GET duy nhất
+        // để đảm bảo logic tải trang mapping luôn nhất quán.
+        //[HttpGet("Mapping/{id}")]
         [ValidateAntiForgeryToken]
         [HttpPost("Mapping/{id}")]
-        // SỬA ĐỔI: Truyền MaxTableNestingLevel khi chuyển đổi DOCX sang HTML.
         public async Task<IActionResult> Mapping(int id)
         {
-            try
+            var template = await _context.Templates
+                .Include(t => t.TemplateFields) // Eager load các field đã có
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.TemplateID == id);
+
+            if (template == null) return NotFound();
+            if (!CanCurrentUserMapping(template))
             {
-                _logger.LogInformation("Loading mapping page for template ID: {TemplateId}", id);
-                var template = await _context.Templates.AsNoTracking().FirstOrDefaultAsync(t => t.TemplateID == id);
-                if (template == null)
-                {
-                    TempData["ErrorMessage"] = $"Không tìm thấy template ID: {id}";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                if (!CanCurrentUserMapping(template))
-                {
-                    TempData["ErrorMessage"] = "Bạn không có quyền ánh xạ template này hoặc template đã được ánh xạ.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                // SỬA ĐỔI: Gọi service để đọc file an toàn
-                var docxBytes = await _templateStorageService.GetFileBytesAsync(template.OriginalDocxFilePath);
-                if (docxBytes == null)
-                {
-                    _logger.LogError("Template file not found or cannot be read: {RelativePath}", template.OriginalDocxFilePath);
-                    TempData["ErrorMessage"] = "Không tìm thấy hoặc không thể đọc file template. Vui lòng liên hệ admin.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                // *** THAY ĐỔI CỐT LÕI: GỌI SERVICE ĐỂ PHÂN TÍCH DOCX ***
-                // Chuyển đổi DOCX sang HTML có nhúng metadata cấu trúc.
-                //string structuredHtml = _docxToHtmlService.ConvertToHtml(docxBytes, isViewMode: false);
-                // SỬA ĐỔI: Truyền giá trị từ settings.
-                string structuredHtml = _docxToHtmlService.ConvertToHtml(docxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: false);
-
-                var availableFields = await GetAvailableFieldsAsync(); // Hàm của bạn
-
-                var fieldViewModels = availableFields.Select(f => new FieldViewModel
-                    {
-                        Name = f.Name,
-                        DisplayName = f.DisplayName,
-                        DataType = f.FieldType ?? "TEXT", // Map FieldType vào DataType
-                        DataSourceType = f.DataSourceType ?? "CIF",
-                        DisplayOrder = f.DisplayOrder ?? 0
-
-                    }).ToList();
-
-                var viewModel = new TemplateMappingViewModel
-                {
-                    TemplateId = template.TemplateID,
-                    TemplateName = template.TemplateName,
-                    AvailableFields = fieldViewModels,
-                    StructuredHtmlContent = structuredHtml // Truyền HTML đã được xử lý xuống View
-                };
-
-                // Truyền cấu hình MaxTableNestingLevel xuống View
-                ViewData["MaxTableNestingLevel"] = _templateSettings.MaxTableNestingLevel;
-
-                return View(viewModel);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading template mapping page for template ID: {TemplateId}", id);
-                TempData["ErrorMessage"] = $"Đã xảy ra lỗi khi tải template (ID: {id}). Vui lòng liên hệ với admin.";
+                TempData["ErrorMessage"] = "Bạn không có quyền ánh xạ template này.";
                 return RedirectToAction(nameof(Index));
-                //return StatusCode(500, "Đã xảy ra lỗi khi tải trang mapping");
             }
+
+            // [SỬA ĐỔI] Luôn tải file gốc để đảm bảo tính nhất quán khi re-mapping.
+            // Việc chèn placeholder sẽ được thực hiện lại từ đầu dựa trên "dấu vân tay" đã lưu.
+            var relativePathToLoad = template.OriginalDocxFilePath;
+            if (string.IsNullOrEmpty(relativePathToLoad))
+            {
+                TempData["ErrorMessage"] = "Không tìm thấy tệp tin gốc của template.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var docxBytes = await _templateStorageService.GetFileBytesAsync(relativePathToLoad);
+            if (docxBytes == null)
+            {
+                TempData["ErrorMessage"] = "Không thể đọc tệp tin gốc của template.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            // [SỬA ĐỔI] Truyền MaxTableNestingLevel xuống View để JavaScript sử dụng
+            ViewData["MaxTableNestingLevel"] = _templateSettings.MaxTableNestingLevel;
+
+            // Chuyển đổi DOCX sang HTML, có nhúng hash vào các paragraph
+            string htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: false);
+
+            // [SỬA ĐỔI] Lấy dữ liệu mapping đã lưu từ cột JSON và tạo DTO
+            var mappedFieldsData = template.TemplateFields?
+                .Where(f => !string.IsNullOrEmpty(f.MappingPositionsJson))
+                .Select(f => new FieldMappingInfo
+                {
+                    FieldName = f.FieldName,
+                    DisplayName = f.DisplayName,
+                    DataType = f.DataType,
+                    IsRequired = f.IsRequired,
+                    DataSourceType = f.DataSourceType,
+                    DisplayOrder = f.DisplayOrder,
+                    // ... các thuộc tính khác của field
+                    Positions = JsonConvert.DeserializeObject<List<FieldPositionFingerprint>>(f.MappingPositionsJson ?? "[]") ?? new List<FieldPositionFingerprint>()
+                })
+                .ToList() ?? new List<FieldMappingInfo>();
+
+            // Lấy danh sách các trường có sẵn
+            var availableCifFields = await GetAvailableCifFieldsAsync();
+            var savedTemplateFields = template.TemplateFields?
+                .Select(f => new AvailableField
+                {
+                    Name = f.FieldName,
+                    DisplayName = f.DisplayName ?? f.FieldName,
+                    FieldType = f.DataType ?? "TEXT",
+                    DataSourceType = f.DataSourceType ?? "FORM",
+                    DisplayOrder = f.DisplayOrder
+                }).ToList() ?? new List<AvailableField>();
+            
+            var allAvailableFields = availableCifFields
+                .Concat(savedTemplateFields)
+                .GroupBy(f => f.Name)
+                .Select(g => g.First())
+                .ToList();
+
+            var viewModel = new TemplateMappingViewModel
+            {
+                TemplateId = template.TemplateID,
+                TemplateName = template.TemplateName,
+                StructuredHtmlContent = htmlContent,
+                AvailableFields = allAvailableFields.Select(f => new FieldViewModel
+                {
+                    Name = f.Name,
+                    DisplayName = f.DisplayName,
+                    DataType = f.FieldType ?? "TEXT",
+                    DataSourceType = f.DataSourceType ?? "INPUT",
+                    DisplayOrder = f.DisplayOrder ?? 999
+                }).OrderBy(f => f.DisplayOrder).ThenBy(f => f.Name).ToList(),
+                // [SỬA ĐỔI] Truyền chuỗi JSON chứa các "dấu vân tay" đã lưu xuống client
+                MappedFieldsJson = JsonConvert.SerializeObject(mappedFieldsData, new JsonSerializerSettings
+                {
+                    ContractResolver = new CamelCasePropertyNamesContractResolver()
+                })
+            };
+
+            return View("Mapping", viewModel);
         }
 
-        /// <summary>
-        /// API lưu thông tin mapping, đã được viết lại theo Giải pháp 2.
-        /// </summary>
+        // [SỬA ĐỔI] Viết lại hoàn toàn action SaveMapping để sử dụng "Dấu vân tay"
         [HttpPost("SaveMapping")]
-        [ValidateAntiForgeryToken] // Nên có khi hoàn thiện
-        // SỬA ĐỔI: Truyền MaxTableNestingLevel khi chuyển đổi DOCX sang HTML.
+        // [ValidateAntiForgeryToken] // Bỏ đi khi dùng API-style với [FromBody]
         public async Task<IActionResult> SaveMapping([FromBody] SaveMappingRequest request)
         {
-            _logger.LogInformation("Starting to save mapping for template ID: {TemplateId}", request?.TemplateId);
+            _logger.LogInformation("Bắt đầu lưu mapping (Hybrid Fingerprinting) cho template ID: {TemplateId}", request?.TemplateId);
             if (request == null || request.Fields.Count == 0)
             {
-                _logger.LogWarning("Invalid mapping data received (null or no fields).");
-                return BadRequest(new { success = false, message = "Không có dữ liệu mapping hợp lệ." });
+                return Json(new { success = false, message = "Không có dữ liệu mapping hợp lệ." });
             }
 
-            // DEBUG: Log mapping data chi tiết
-            _logger.LogInformation("Received mapping data: {FieldCount} fields", request.Fields.Count);
-            foreach (var field in request.Fields)
-            {
-                _logger.LogInformation("Field: {FieldName}, Positions: {PositionCount}", field.FieldName, field.Positions.Count);
-                foreach (var position in field.Positions)
-                {
-                    _logger.LogInformation("  - ElementId: {ElementId}, DocxPath: {DocxPath}, CharOffset: {CharOffset}, IsInNestedTable: {IsInNestedTable}",
-                        position.ElementId, position.DocxPath, position.CharOffset, position.IsInNestedTable);
-                }
-            }
-
-            // Validate theo MaxTableNestingLevel từ cấu hình
-            // NestedDepth = 1 (bảng cha), NestedDepth = 2 (bảng con lồng 1 cấp), v.v.
-            // MaxTableNestingLevel = 0: chỉ cho phép bảng cha (NestedDepth = 1)
-            // MaxTableNestingLevel = 1: cho phép bảng cha + bảng con lồng 1 cấp (NestedDepth <= 2)
-            var maxAllowedDepth = _templateSettings.MaxTableNestingLevel + 1; // +1 vì NestedDepth bắt đầu từ 1
-
+            // [THÊM MỚI] Validate theo MaxTableNestingLevel từ cấu hình
+            var maxAllowedDepth = _templateSettings.MaxTableNestingLevel + 1; // +1 vì NestedDepth của service bắt đầu từ 1 cho bảng cha
             var invalidNestedPositions = request.Fields
                 .SelectMany(f => f.Positions.Where(p => p.NestedDepth > maxAllowedDepth))
                 .ToList();
@@ -785,197 +879,393 @@ namespace CTOM.Controllers
                 var fieldNames = request.Fields
                     .Where(f => f.Positions.Any(p => p.NestedDepth > maxAllowedDepth))
                     .Select(f => f.FieldName)
+                    .Distinct()
                     .ToList();
+                
+                var nestingLevelText = _templateSettings.MaxTableNestingLevel == 0 ? "bảng cha" : $"bảng lồng tối đa {_templateSettings.MaxTableNestingLevel} cấp";
 
-                _logger.LogWarning("Attempted to map fields into tables nested too deeply: {FieldNames}, MaxAllowedDepth: {MaxDepth}",
-                    string.Join(", ", fieldNames), maxAllowedDepth);
+                _logger.LogWarning("Phát hiện mapping vào bảng lồng quá sâu. Các trường: {FieldNames}, Cấp độ cho phép: {MaxDepth}", string.Join(", ", fieldNames), maxAllowedDepth);
 
-                var nestingLevelText = _templateSettings.MaxTableNestingLevel == 0 ? "bảng cha" :
-                              _templateSettings.MaxTableNestingLevel == 1 ? "bảng cha và bảng con lồng 1 cấp" :
-                              $"bảng lồng tối đa {_templateSettings.MaxTableNestingLevel} cấp";
-
-                return BadRequest(new {
+                return Json(new {
                     success = false,
-                    message = $"Không thể mapping vào bảng lồng quá sâu. Hệ thống chỉ cho phép mapping vào {nestingLevelText}. Các trường sau vi phạm quy tắc: {string.Join(", ", fieldNames)}."
+                    message = $"Không thể mapping vào bảng lồng quá sâu. Hệ thống chỉ cho phép mapping vào {nestingLevelText}. Các trường sau vi phạm: {string.Join(", ", fieldNames)}."
                 });
             }
 
             using var transaction = await _context.Database.BeginTransactionAsync();
-            _logger.LogInformation("Transaction started.");
-
             try
             {
                 var template = await _context.Templates.Include(t => t.TemplateFields).FirstOrDefaultAsync(t => t.TemplateID == request.TemplateId);
                 if (template == null)
                 {
-                    _logger.LogWarning("Template with ID {TemplateId} not found during save.", request.TemplateId);
                     return NotFound(new { success = false, message = "Không tìm thấy template." });
                 }
 
-                // SỬA ĐỔI: Gọi service để đọc file an toàn
-                var docxBytes = await _templateStorageService.GetFileBytesAsync(template.OriginalDocxFilePath);
-                if (docxBytes == null)
+                // 1. [TÙY CHỌN] Tạo và lưu file mapped.docx vật lý.
+                // Theo Phương án 1, bước này không bắt buộc, nhưng có thể giữ lại để tương thích ngược
+                // hoặc phục vụ các mục đích khác nếu cần.
+                var originalDocxBytes = await _templateStorageService.GetFileBytesAsync(template.OriginalDocxFilePath);
+                if (originalDocxBytes != null)
                 {
-                     return StatusCode(500, new { success = false, message = "Không thể đọc file template gốc." });
-                }
-                byte[] mappedDocxBytes;
-
-                using (MemoryStream stream = new MemoryStream())
-                {
-                    await stream.WriteAsync(docxBytes);
-                    using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(stream, true))
+                    byte[] mappedDocxBytes;
+                    using (var memoryStream = new MemoryStream())
                     {
-                        var body = wordDoc.MainDocumentPart?.Document?.Body;
-                        if (body == null)
+                        await memoryStream.WriteAsync(originalDocxBytes);
+                        using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(memoryStream, true))
                         {
-                            _logger.LogError("Không thể đọc nội dung tài liệu: MainDocumentPart hoặc Document hoặc Body là null");
-                            return BadRequest(new { success = false, message = "Không thể đọc nội dung tài liệu" });
+                            InsertPlaceholdersByFingerprint(wordDoc, request.Fields);
                         }
-                        // *** THÊM DÒNG NÀY: Lấy style mặc định của văn bản ***
-                        var defaultRunProperties = GetDefaultRunProperties(wordDoc.MainDocumentPart);
-
-                        // *** LOGIC MỚI: SỬ DỤNG HTML TỪ DocxToStructuredHtmlService ĐỂ LẤY ELEMENT MAPPING ***
-                        // Tạo HTML từ DOCX và parse để lấy element ID mapping chính xác
-                        _logger.LogInformation("Creating element ID mapping using DocxToStructuredHtmlService HTML output...");
-
-                        // Tạo HTML từ DOCX để lấy các element ID
-                        //var htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, isViewMode: false);
-                        // SỬA ĐỔI: Truyền giá trị từ settings.
-                        var htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: false);
-
-                        // Parse HTML để lấy tất cả element ID và map với DOCX elements
-                        var elementIdMap = CreateElementIdMapFromHtml(htmlContent, body);
-
-                        _logger.LogInformation("Created {ElementCount} element mappings from HTML", elementIdMap.Count);
-
-                        // Log một số ID để debug
-                        var sampleIds = elementIdMap.Keys.Take(20).ToList();
-                        _logger.LogInformation("Sample element IDs: {SampleIds}", string.Join(", ", sampleIds));
-
-                        // Sắp xếp các vị trí cần chèn theo thứ tự ngược để không làm ảnh hưởng đến vị trí sau
-                        var sortedInsertions = request.Fields
-                            .SelectMany(f => f.Positions.Select(p => new { f.FieldName, Position = p }))
-                            .Where(item => !string.IsNullOrEmpty(item.Position.ElementId)) // Chỉ xử lý positions có ElementId
-                            .OrderByDescending(item => item.Position.CharOffset) // Sắp xếp theo offset để chèn từ cuối lên đầu
-                            .ToList();
-
-                        _logger.LogInformation("Processing {Count} placeholder insertions using ElementId mapping.", sortedInsertions.Count);
-
-                        foreach (var item in sortedInsertions)
-                        {
-                            var pos = item.Position;
-                            _logger.LogInformation("Processing field: {FieldName} with ElementId: {ElementId}", item.FieldName, pos.ElementId);
-
-                            // Tìm element dựa trên ElementId
-                            if (!elementIdMap.TryGetValue(pos.ElementId!, out var targetElement))
-                            {
-                                _logger.LogWarning("Cannot find element with ID: {ElementId} in elementIdMap. Available IDs: {AvailableIds}",
-                                    pos.ElementId, string.Join(", ", elementIdMap.Keys.Take(10)));
-                                continue;
-                            }
-
-                            _logger.LogInformation("Found target element: {ElementType} for ElementId: {ElementId}",
-                                targetElement.GetType().Name, pos.ElementId);
-
-                            // *** LOGIC MỚI: XỬ LÝ MERGE TEXT TỪ NHIỀU RUN ĐỂ MAPPING CHÍNH XÁC ***
-                            //var insertResult = InsertPlaceholderWithMergedText(targetElement, pos.CharOffset, item.FieldName);
-                            // *** SỬA DÒNG NÀY: Truyền style mặc định vào hàm chèn placeholder ***
-                            var insertResult = InsertPlaceholderWithMergedText(targetElement, pos.CharOffset, item.FieldName, defaultRunProperties);
-
-                            if (insertResult.Success)
-                            {
-                                _logger.LogInformation("Successfully inserted placeholder '{FieldName}' at position {Position}. Result: '{ResultText}'",
-                                    item.FieldName, insertResult.InsertPosition, insertResult.ResultText);
-                            }
-                            else
-                            {
-                                _logger.LogWarning("Failed to insert placeholder '{FieldName}': {ErrorMessage}",
-                                    item.FieldName, insertResult.ErrorMessage);
-                            }
-                        }
-                        wordDoc?.MainDocumentPart?.Document?.Save();
+                        mappedDocxBytes = memoryStream.ToArray();
                     }
-                    mappedDocxBytes = stream.ToArray();
+                    var mappedFileName = Path.GetFileName(template.OriginalDocxFilePath)?.Replace("_original", "_mapped") ?? $"{template.TemplateID}_mapped.docx";
+                    var mappedRelativePath = Path.Combine(Path.GetDirectoryName(template.OriginalDocxFilePath) ?? string.Empty, mappedFileName).Replace('\\', '/');
+                    await _templateStorageService.SaveFileAsync(mappedDocxBytes, mappedRelativePath);
+                    template.MappedDocxFilePath = mappedRelativePath;
+                    _logger.LogInformation("Đã cập nhật file mapped.docx vào: {MappedPath}", mappedRelativePath);
                 }
 
-                // Lưu file đã được mapped
-                //var fullOriginalPath = _templateStorageService.GetFullPath(template.OriginalDocxFilePath);
-                var mappedFileName = Path.GetFileName(template.OriginalDocxFilePath)?.Replace("_original", "_mapped") ?? "";
-                var mappedRelativePath = Path.Combine(Path.GetDirectoryName(template.OriginalDocxFilePath) ?? string.Empty, mappedFileName);
-                var fullMappedPath = _templateStorageService.GetFullPath(mappedRelativePath);
-
-                // Tạo thư mục nếu chưa tồn tại
-                var directory = Path.GetDirectoryName(fullMappedPath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                // 2. Cập nhật CSDL (Nguồn chân lý duy nhất)
+                // Xóa mapping cũ
+                foreach (var field in template.TemplateFields)
                 {
-                    Directory.CreateDirectory(directory);
+                    field.MappingPositionsJson = null;
                 }
 
-                // Lưu file đã được mapped
-                //await System.IO.File.WriteAllBytesAsync(fullMappedPath, mappedDocxBytes);
-                // SỬA ĐỔI: Dùng service để lưu file thay vì System.IO
-                await _templateStorageService.SaveFileAsync(mappedDocxBytes, mappedRelativePath);
-                _logger.LogInformation("Mapped document saved to: {MappedPath}", fullMappedPath);
-
-                // Cập nhật thông tin template
-                template.MappedDocxFilePath = mappedRelativePath;
-                template.Status = "Mapped";
-                template.IsActive = true;  // Kích hoạt template
-                template.LastModificationTimestamp = DateTime.Now;
-
-                // Xóa các field cũ và thêm các field mới
-                if (template.TemplateFields?.Count > 0)
+                // Cập nhật mapping mới bằng "dấu vân tay"
+                foreach (var fieldInfo in request.Fields)
                 {
-                    _context.TemplateFields.RemoveRange(template.TemplateFields);
-                }
-
-                foreach (var field in request.Fields)
-                {
-                    var templateField = new TemplateField
+                    var fieldToUpdate = template.TemplateFields.FirstOrDefault(f => f.FieldName == fieldInfo.FieldName);
+                    if (fieldToUpdate != null)
                     {
-                        TemplateID = request.TemplateId,
-                        FieldName = field.FieldName,
-                        DisplayName = field.DisplayName,
-                        DataType = field.DataType,
-                        IsRequired = field.IsRequired,
-                        DefaultValue = field.DefaultValue,
-                        DisplayOrder = field.DisplayOrder,
-                        Description = field.Description,
-                        DataSourceType = field.DataSourceType,
-                        CalculationFormula = field.CalculationFormula
-                    };
-                    _context.TemplateFields.Add(templateField);
+                        if (fieldInfo.Positions.Count > 0)
+                        {
+                            fieldToUpdate.MappingPositionsJson = JsonConvert.SerializeObject(fieldInfo.Positions);
+                        }
+                    }
+                    else
+                    {
+                        var newTemplateField = new TemplateField
+                        {
+                            TemplateID = request.TemplateId,
+                            FieldName = fieldInfo.FieldName,
+                            DisplayName = fieldInfo.DisplayName,
+                            DataType = fieldInfo.DataType,
+                            IsRequired = fieldInfo.IsRequired,
+                            DataSourceType = fieldInfo.DataSourceType,
+                            MappingPositionsJson = fieldInfo.Positions.Count > 0 ? JsonConvert.SerializeObject(fieldInfo.Positions) : null
+                        };
+                        _context.TemplateFields.Add(newTemplateField);
+                    }
                 }
+
+                // Cập nhật trạng thái template
+                template.Status = "Mapped";
+                template.IsActive = true;
+                template.LastModificationTimestamp = DateTime.Now;
+                template.LastModifiedByUserName = _currentUser.UserName;
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                _logger.LogInformation("Successfully saved mapping and committed transaction for template ID: {TemplateId}", request.TemplateId);
-
-                // 7. Trả về response thành công để client chuyển hướng
-                TempData["SuccessMessage"] = $"Lưu ánh xạ thành công template ID: {template.TemplateID} - {template.TemplateName}";
-                return Json(new { success = true, message = "Lưu ánh xạ thành công.",redirectUrl = Url.Action(nameof(Index)) });
-
-                //return Ok(new { success = true, message = "Lưu mapping thành công."/*, redirectUrl = Url.Action(nameof(Index))*/ });
+                _logger.LogInformation("Lưu mapping và commit transaction thành công cho template ID: {TemplateId}", request.TemplateId);
+                
+                // Trả về thông báo thành công, không còn redirectUrl
+                return Json(new { success = true, message = "Lưu ánh xạ thành công!" });
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                _logger.LogError(ex, "Error saving mapping for template ID: {TemplateId}", request.TemplateId);
+                _logger.LogError(ex, "Lỗi khi lưu mapping cho template ID: {TemplateId}", request.TemplateId);
                 return StatusCode(500, new { success = false, message = $"Đã xảy ra lỗi nghiêm trọng: {ex.Message}" });
             }
         }
 
+        // /// <summary>
+        // /// Lưu kết quả mapping.
+        // /// Cập nhật: Luôn xóa các field cũ trước khi lưu field mới.
+        // /// </summary>
+        // [HttpPost("SaveMapping")]
+        // [ValidateAntiForgeryToken] // Nên có khi hoàn thiện
+        // // SỬA ĐỔI: Truyền MaxTableNestingLevel khi chuyển đổi DOCX sang HTML.
+        // public async Task<IActionResult> SaveMapping([FromBody] SaveMappingRequest request)
+        // {
+        //     _logger.LogInformation("Starting to save mapping for template ID: {TemplateId}", request?.TemplateId);
+        //     if (request == null || request.Fields.Count == 0)
+        //     {
+        //         _logger.LogWarning("Invalid mapping data received (null or no fields).");
+        //         return BadRequest(new { success = false, message = "Không có dữ liệu mapping hợp lệ." });
+        //     }
+
+        //     // DEBUG: Log mapping data chi tiết
+        //     _logger.LogInformation("Received mapping data: {FieldCount} fields", request.Fields.Count);
+        //     foreach (var field in request.Fields)
+        //     {
+        //         _logger.LogInformation("Field: {FieldName}, Positions: {PositionCount}", field.FieldName, field.Positions.Count);
+        //         foreach (var position in field.Positions)
+        //         {
+        //             _logger.LogInformation("  - ElementId: {ElementId}, DocxPath: {DocxPath}, CharOffset: {CharOffset}, IsInNestedTable: {IsInNestedTable}",
+        //                 position.ElementId, position.DocxPath, position.CharOffset, position.IsInNestedTable);
+        //         }
+        //     }
+
+        //     // Validate theo MaxTableNestingLevel từ cấu hình
+        //     // NestedDepth = 1 (bảng cha), NestedDepth = 2 (bảng con lồng 1 cấp), v.v.
+        //     // MaxTableNestingLevel = 0: chỉ cho phép bảng cha (NestedDepth = 1)
+        //     // MaxTableNestingLevel = 1: cho phép bảng cha + bảng con lồng 1 cấp (NestedDepth <= 2)
+        //     var maxAllowedDepth = _templateSettings.MaxTableNestingLevel + 1; // +1 vì NestedDepth bắt đầu từ 1
+
+        //     var invalidNestedPositions = request.Fields
+        //         .SelectMany(f => f.Positions.Where(p => p.NestedDepth > maxAllowedDepth))
+        //         .ToList();
+
+        //     if (invalidNestedPositions.Count > 0)
+        //     {
+        //         var fieldNames = request.Fields
+        //             .Where(f => f.Positions.Any(p => p.NestedDepth > maxAllowedDepth))
+        //             .Select(f => f.FieldName)
+        //             .ToList();
+
+        //         _logger.LogWarning("Attempted to map fields into tables nested too deeply: {FieldNames}, MaxAllowedDepth: {MaxDepth}",
+        //             string.Join(", ", fieldNames), maxAllowedDepth);
+
+        //         var nestingLevelText = _templateSettings.MaxTableNestingLevel == 0 ? "bảng cha" :
+        //                       _templateSettings.MaxTableNestingLevel == 1 ? "bảng cha và bảng con lồng 1 cấp" :
+        //                       $"bảng lồng tối đa {_templateSettings.MaxTableNestingLevel} cấp";
+
+        //         return BadRequest(new {
+        //             success = false,
+        //             message = $"Không thể mapping vào bảng lồng quá sâu. Hệ thống chỉ cho phép mapping vào {nestingLevelText}. Các trường sau vi phạm quy tắc: {string.Join(", ", fieldNames)}."
+        //         });
+        //     }
+
+        //     using var transaction = await _context.Database.BeginTransactionAsync();
+        //     _logger.LogInformation("Transaction started for Template ID: {TemplateId}", request.TemplateId);
+
+        //     try
+        //     {
+        //         var template = await _context.Templates.Include(t => t.TemplateFields).FirstOrDefaultAsync(t => t.TemplateID == request.TemplateId);
+        //         if (template == null)
+        //         {
+        //             _logger.LogWarning("Template with ID {TemplateId} not found during save.", request.TemplateId);
+        //             return NotFound(new { success = false, message = "Không tìm thấy template." });
+        //         }
+
+        //         // // YÊU CẦU PRD: Xóa các field cũ trước khi thêm field mới để thực hiện "chỉnh sửa"
+        //         // if (template.TemplateFields != null && template.TemplateFields.Count > 0)
+        //         // {
+        //         //     _logger.LogInformation("Removing {FieldCount} existing template fields for Template ID {TemplateId}", template.TemplateFields.Count, template.TemplateID);
+        //         //     _context.TemplateFields.RemoveRange(template.TemplateFields);
+        //         // }
+        //         // // end YÊU CẦU PRD: Xóa các field cũ trước khi thêm field mới để thực hiện "chỉnh sửa"
+
+        //         // SỬA ĐỔI: Gọi service để đọc file an toàn
+        //         var docxBytes = await _templateStorageService.GetFileBytesAsync(template.OriginalDocxFilePath);
+        //         if (docxBytes == null)
+        //         {
+        //              return StatusCode(500, new { success = false, message = "Không thể đọc file template gốc." });
+        //         }
+        //         byte[] mappedDocxBytes;
+
+        //         using (MemoryStream stream = new MemoryStream())
+        //         {
+        //             await stream.WriteAsync(docxBytes);
+        //             using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(stream, true))
+        //             {
+        //                 var body = wordDoc.MainDocumentPart?.Document?.Body;
+        //                 if (body == null)
+        //                 {
+        //                     _logger.LogError("Không thể đọc nội dung tài liệu: MainDocumentPart hoặc Document hoặc Body là null");
+        //                     return BadRequest(new { success = false, message = "Không thể đọc nội dung tài liệu" });
+        //                 }
+        //                 // *** THÊM DÒNG NÀY: Lấy style mặc định của văn bản ***
+        //                 var defaultRunProperties = GetDefaultRunProperties(wordDoc.MainDocumentPart);
+
+        //                 // *** LOGIC MỚI: SỬ DỤNG HTML TỪ DocxToStructuredHtmlService ĐỂ LẤY ELEMENT MAPPING ***
+        //                 // Tạo HTML từ DOCX và parse để lấy element ID mapping chính xác
+        //                 _logger.LogInformation("Creating element ID mapping using DocxToStructuredHtmlService HTML output...");
+
+        //                 // Tạo HTML từ DOCX để lấy các element ID
+        //                 //var htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, isViewMode: false);
+        //                 // SỬA ĐỔI: Truyền giá trị từ settings.
+        //                 var htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: false);
+
+        //                 // Parse HTML để lấy tất cả element ID và map với DOCX elements
+        //                 var elementIdMap = CreateElementIdMapFromHtml(htmlContent, body);
+
+        //                 _logger.LogInformation("Created {ElementCount} element mappings from HTML", elementIdMap.Count);
+
+        //                 // Log một số ID để debug
+        //                 var sampleIds = elementIdMap.Keys.Take(20).ToList();
+        //                 _logger.LogInformation("Sample element IDs: {SampleIds}", string.Join(", ", sampleIds));
+
+        //                 // Sắp xếp các vị trí cần chèn theo thứ tự ngược để không làm ảnh hưởng đến vị trí sau
+        //                 var sortedInsertions = request.Fields
+        //                     .SelectMany(f => f.Positions.Select(p => new { f.FieldName, Position = p }))
+        //                     .Where(item => !string.IsNullOrEmpty(item.Position.ElementId)) // Chỉ xử lý positions có ElementId
+        //                     .OrderByDescending(item => item.Position.CharOffset) // Sắp xếp theo offset để chèn từ cuối lên đầu
+        //                     .ToList();
+
+        //                 _logger.LogInformation("Processing {Count} placeholder insertions using ElementId mapping.", sortedInsertions.Count);
+
+        //                 foreach (var item in sortedInsertions)
+        //                 {
+        //                     var pos = item.Position;
+        //                     _logger.LogInformation("Processing field: {FieldName} with ElementId: {ElementId}", item.FieldName, pos.ElementId);
+
+        //                     // Tìm element dựa trên ElementId
+        //                     if (!elementIdMap.TryGetValue(pos.ElementId!, out var targetElement))
+        //                     {
+        //                         _logger.LogWarning("Cannot find element with ID: {ElementId} in elementIdMap. Available IDs: {AvailableIds}",
+        //                             pos.ElementId, string.Join(", ", elementIdMap.Keys.Take(10)));
+        //                         continue;
+        //                     }
+
+        //                     _logger.LogInformation("Found target element: {ElementType} for ElementId: {ElementId}",
+        //                         targetElement.GetType().Name, pos.ElementId);
+
+        //                     // *** LOGIC MỚI: XỬ LÝ MERGE TEXT TỪ NHIỀU RUN ĐỂ MAPPING CHÍNH XÁC ***
+        //                     //var insertResult = InsertPlaceholderWithMergedText(targetElement, pos.CharOffset, item.FieldName);
+        //                     // *** SỬA DÒNG NÀY: Truyền style mặc định vào hàm chèn placeholder ***
+        //                     var insertResult = InsertPlaceholderWithMergedText(targetElement, pos.CharOffset, item.FieldName, defaultRunProperties);
+
+        //                     if (insertResult.Success)
+        //                     {
+        //                         _logger.LogInformation("Successfully inserted placeholder '{FieldName}' at position {Position}. Result: '{ResultText}'",
+        //                             item.FieldName, insertResult.InsertPosition, insertResult.ResultText);
+        //                     }
+        //                     else
+        //                     {
+        //                         _logger.LogWarning("Failed to insert placeholder '{FieldName}': {ErrorMessage}",
+        //                             item.FieldName, insertResult.ErrorMessage);
+        //                     }
+        //                 }
+        //                 wordDoc?.MainDocumentPart?.Document?.Save();
+        //             }
+        //             mappedDocxBytes = stream.ToArray();
+        //         }
+
+        //         // Lưu file đã được mapped
+        //         //var fullOriginalPath = _templateStorageService.GetFullPath(template.OriginalDocxFilePath);
+        //         var mappedFileName = Path.GetFileName(template.OriginalDocxFilePath)?.Replace("_original", "_mapped") ?? "";
+        //         var mappedRelativePath = Path.Combine(Path.GetDirectoryName(template.OriginalDocxFilePath) ?? string.Empty, mappedFileName);
+        //         var fullMappedPath = _templateStorageService.GetFullPath(mappedRelativePath);
+
+        //         // Tạo thư mục nếu chưa tồn tại
+        //         var directory = Path.GetDirectoryName(fullMappedPath);
+        //         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        //         {
+        //             Directory.CreateDirectory(directory);
+        //         }
+
+        //         // Lưu file đã được mapped
+        //         //await System.IO.File.WriteAllBytesAsync(fullMappedPath, mappedDocxBytes);
+        //         // SỬA ĐỔI: Dùng service để lưu file thay vì System.IO
+        //         await _templateStorageService.SaveFileAsync(mappedDocxBytes, mappedRelativePath);
+        //         _logger.LogInformation("Mapped document saved to: {MappedPath}", fullMappedPath);
+
+        //         // Cập nhật thông tin template
+        //         template.MappedDocxFilePath = mappedRelativePath;
+        //         template.Status = "Mapped";
+        //         template.IsActive = true;  // Kích hoạt template
+        //         template.LastModificationTimestamp = DateTime.Now;
+        //         template.LastModifiedByUserName = _currentUser.UserName;
+
+        //         // Xóa các field cũ và thêm các field mới
+        //         if (template.TemplateFields?.Count > 0)
+        //         {
+        //             _logger.LogInformation("Removing {FieldCount} existing template fields for Template ID {TemplateId}", template.TemplateFields.Count, template.TemplateID);
+        //             _context.TemplateFields.RemoveRange(template.TemplateFields);
+        //         }
+
+        //         foreach (var field in request.Fields)
+        //         {
+        //             var templateField = new TemplateField
+        //             {
+        //                 TemplateID = request.TemplateId,
+        //                 FieldName = field.FieldName,
+        //                 DisplayName = field.DisplayName,
+        //                 DataType = field.DataType,
+        //                 IsRequired = field.IsRequired,
+        //                 DefaultValue = field.DefaultValue,
+        //                 DisplayOrder = field.DisplayOrder,
+        //                 Description = field.Description,
+        //                 DataSourceType = field.DataSourceType,
+        //                 CalculationFormula = field.CalculationFormula
+        //             };
+        //             _context.TemplateFields.Add(templateField);
+        //         }
+
+        //         await _context.SaveChangesAsync();
+        //         await transaction.CommitAsync();
+
+        //         _logger.LogInformation("Successfully saved mapping and committed transaction for template ID: {TemplateId}", request.TemplateId);
+
+        //         // 7. Trả về response thành công để client chuyển hướng
+        //         TempData["SuccessMessage"] = $"Lưu ánh xạ thành công template ID: {template.TemplateID} - {template.TemplateName}";
+        //         return Json(new { success = true, message = "Lưu ánh xạ thành công.",redirectUrl = Url.Action(nameof(Index)) });
+
+        //         //return Ok(new { success = true, message = "Lưu mapping thành công."/*, redirectUrl = Url.Action(nameof(Index))*/ });
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         await transaction.RollbackAsync();
+        //         _logger.LogError(ex, "Error saving mapping for template ID: {TemplateId}", request.TemplateId);
+        //         return StatusCode(500, new { success = false, message = $"Đã xảy ra lỗi nghiêm trọng: {ex.Message}" });
+        //     }
+        // }
+
+        // /// <summary>
+        // /// Lấy danh sách các trường có sẵn để mapping dưới dạng AvailableField
+        // /// </summary>
+        // private async Task<List<AvailableField>> GetAvailableFieldsAsync()
+        // {
+        //     try
+        //     {
+        //         _logger?.LogInformation("Đang lấy danh sách các trường CIF có sẵn từ database");
+
+        //         // Lấy danh sách các trường CIF từ database
+        //         var cifFields = await _context.AvailableCifFields
+        //             .Where(f => f.IsActive)
+        //             .OrderBy(f => f.DisplayOrder)
+        //             .Select(f => new AvailableField
+        //             {
+        //                 Name = f.FieldName,
+        //                 DisplayName = f.DisplayName ?? f.FieldName,
+        //                 FieldType = f.DataType ?? "TEXT",
+        //                 //Description = f.Description,
+        //                 DataSourceType = f.FieldTagPrefix
+        //             })
+        //             .ToListAsync();
+
+        //         //// Kết hợp danh sách trường CIF và trường hệ thống
+        //         //var allFields = cifFields.Concat(systemFields).ToList();
+        //         var allFields = cifFields;
+
+        //         return allFields;
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         _logger?.LogError(ex, "Lỗi khi lấy danh sách trường CIF từ database");
+
+        //         // Trả về danh sách mặc định nếu có lỗi
+        //         return new List<AvailableField>
+        //         {
+        //             new() { Name = "SoCif", DisplayName = "Số CIF", FieldType = "TEXT", DataSourceType = "CIF" },
+        //             new() { Name = "TenCif", DisplayName = "Tên khách hàng", FieldType = "TEXT", DataSourceType = "CIF" }
+        //         };
+        //     }
+        // }
+
+        // === BỔ SUNG: Thêm lại phương thức bị thiếu ===
         /// <summary>
-        /// Lấy danh sách các trường có sẵn để mapping dưới dạng AvailableField
+        /// Lấy danh sách các trường CIF có sẵn để mapping
         /// </summary>
-        private async Task<List<AvailableField>> GetAvailableFieldsAsync()
+        private async Task<List<AvailableField>> GetAvailableCifFieldsAsync()
         {
             try
             {
                 _logger?.LogInformation("Đang lấy danh sách các trường CIF có sẵn từ database");
 
-                // Lấy danh sách các trường CIF từ database
                 var cifFields = await _context.AvailableCifFields
                     .Where(f => f.IsActive)
                     .OrderBy(f => f.DisplayOrder)
@@ -984,29 +1274,20 @@ namespace CTOM.Controllers
                         Name = f.FieldName,
                         DisplayName = f.DisplayName ?? f.FieldName,
                         FieldType = f.DataType ?? "TEXT",
-                        //Description = f.Description,
-                        DataSourceType = f.FieldTagPrefix
+                        DataSourceType = "CIF", // Gán cứng là CIF
+                        DisplayOrder = f.DisplayOrder
                     })
                     .ToListAsync();
 
-                //// Kết hợp danh sách trường CIF và trường hệ thống
-                //var allFields = cifFields.Concat(systemFields).ToList();
-                var allFields = cifFields;
-
-                return allFields;
+                return cifFields;
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Lỗi khi lấy danh sách trường CIF từ database");
-
-                // Trả về danh sách mặc định nếu có lỗi
-                return new List<AvailableField>
-                {
-                    new() { Name = "SoCif", DisplayName = "Số CIF", FieldType = "TEXT", DataSourceType = "CIF" },
-                    new() { Name = "TenCif", DisplayName = "Tên khách hàng", FieldType = "TEXT", DataSourceType = "CIF" }
-                };
+                return new List<AvailableField>(); // Trả về danh sách rỗng nếu có lỗi
             }
         }
+        // === KẾT THÚC BỔ SUNG ===
 
         #endregion
 
@@ -1570,6 +1851,161 @@ namespace CTOM.Controllers
 
             // Nếu không tìm thấy, trả về null
             return null;
+        }
+
+        #endregion
+
+        #region [THÊM MỚI] Helper Methods for Hybrid Fingerprinting
+        
+        private void InsertPlaceholdersByFingerprint(WordprocessingDocument doc, List<FieldMappingInfo> fieldMappings)
+        {
+            var mainPart = doc.MainDocumentPart;
+            if (mainPart?.Document?.Body == null) return;
+
+            var allParagraphs = mainPart.Document.Body.Descendants<Paragraph>().ToList();
+
+            // Tạo danh sách phẳng tất cả các vị trí cần chèn, sắp xếp ngược để không ảnh hưởng chỉ số
+            var allPositions = fieldMappings
+                .SelectMany(field => field.Positions.Select(pos => new { FieldName = field.FieldName, Position = pos }))
+                .OrderByDescending(item => GetParagraphIndex(allParagraphs, item.Position))
+                .ThenByDescending(item => item.Position.CharOffsetInRun) // Ưu tiên chèn từ cuối lên đầu trong cùng 1 paragraph
+                .ToList();
+
+            foreach (var item in allPositions)
+            {
+                var fingerprint = item.Position;
+                Paragraph? targetParagraph = FindParagraphByFingerprint(allParagraphs, fingerprint);
+
+                if (targetParagraph == null)
+                {
+                    _logger.LogWarning("Không tìm thấy Paragraph với hash: {ParagraphHash} cho field {FieldName}", fingerprint.ParagraphHash, item.FieldName);
+                    continue;
+                }
+                
+                var insertionPoint = FindInsertionPointInParagraph(targetParagraph, fingerprint);
+                if (insertionPoint.TargetNode != null)
+                {
+                    SplitAndInsertText(insertionPoint.TargetNode, insertionPoint.OffsetInNode, $"<<{item.FieldName}>>");
+                }
+                else
+                {
+                    _logger.LogWarning("Không tìm thấy vị trí chèn chính xác trong Paragraph cho field: {FieldName} bằng ContextText. Thử chèn vào cuối.", item.FieldName);
+                    // Fallback: Nếu không tìm được bằng context, chèn vào cuối paragraph
+                    var lastRun = targetParagraph.Elements<Run>().LastOrDefault();
+                    if (lastRun != null)
+                    {
+                        lastRun.Append(new Text($"<<{item.FieldName}>>") { Space = SpaceProcessingModeValues.Preserve });
+                    }
+                    else // Paragraph trống
+                    {
+                        targetParagraph.Append(new Run(new Text($"<<{item.FieldName}>>")));
+                    }
+                }
+            }
+            mainPart.Document.Save();
+        }
+
+        private int GetParagraphIndex(List<Paragraph> allParagraphs, FieldPositionFingerprint fingerprint)
+        {
+            for (int i = 0; i < allParagraphs.Count; i++)
+            {
+                if (ComputeSha256Hash(allParagraphs[i].InnerText) == fingerprint.ParagraphHash)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private Paragraph? FindParagraphByFingerprint(List<Paragraph> allParagraphs, FieldPositionFingerprint fingerprint)
+        {
+            return allParagraphs.FirstOrDefault(p => ComputeSha256Hash(p.InnerText) == fingerprint.ParagraphHash);
+        }
+
+        private (Text? TargetNode, int OffsetInNode) FindInsertionPointInParagraph(Paragraph p, FieldPositionFingerprint fingerprint)
+        {
+            var allTextNodes = p.Descendants<Text>().ToList();
+            var fullParagraphText = new StringBuilder();
+            var nodeMap = new List<(Text node, int start, int end)>();
+
+            foreach (var textNode in allTextNodes)
+            {
+                int start = fullParagraphText.Length;
+                fullParagraphText.Append(textNode.Text);
+                nodeMap.Add((textNode, start, fullParagraphText.Length));
+            }
+
+            string flatText = fullParagraphText.ToString();
+            
+            // Tìm vị trí dựa trên context
+            int contextStartIndex = flatText.IndexOf(fingerprint.ContextBeforeText, StringComparison.Ordinal);
+            if (contextStartIndex != -1)
+            {
+                int insertionIndex = contextStartIndex + fingerprint.ContextBeforeText.Length;
+                string remainingText = flatText.Substring(insertionIndex);
+
+                // Kiểm tra xem context after có khớp không
+                if (remainingText.StartsWith(fingerprint.ContextAfterText))
+                {
+                    foreach (var mapItem in nodeMap)
+                    {
+                        if (insertionIndex >= mapItem.start && insertionIndex <= mapItem.end)
+                        {
+                            int offsetInNode = insertionIndex - mapItem.start;
+                            return (mapItem.node, offsetInNode);
+                        }
+                    }
+                }
+            }
+            return (null, -1);
+        }
+
+        private void SplitAndInsertText(Text targetTextNode, int offset, string textToInsert)
+        {
+            var parentRun = targetTextNode.Parent as Run;
+            if (parentRun == null) return;
+
+            string originalText = targetTextNode.Text;
+            string beforeText = originalText.Substring(0, offset);
+            string afterText = originalText.Substring(offset);
+
+            targetTextNode.Text = beforeText;
+            targetTextNode.Space = SpaceProcessingModeValues.Preserve;
+
+            var placeholderRun = new Run();
+            if (parentRun.RunProperties != null)
+            {
+                placeholderRun.Append(parentRun.RunProperties.CloneNode(true));
+            }
+            placeholderRun.Append(new Text(textToInsert) { Space = SpaceProcessingModeValues.Preserve });
+
+            parentRun.InsertAfterSelf(placeholderRun);
+
+            if (!string.IsNullOrEmpty(afterText))
+            {
+                var afterRun = new Run();
+                if (parentRun.RunProperties != null)
+                {
+                    afterRun.Append(parentRun.RunProperties.CloneNode(true));
+                }
+                afterRun.Append(new Text(afterText) { Space = SpaceProcessingModeValues.Preserve });
+                placeholderRun.InsertAfterSelf(afterRun);
+            }
+        }
+
+        private static string ComputeSha256Hash(string rawData)
+        {
+            if (string.IsNullOrEmpty(rawData)) return string.Empty;
+            using (SHA256 sha256Hash = SHA256.Create())
+            {
+                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+                var builder = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    builder.Append(bytes[i].ToString("x2"));
+                }
+                return builder.ToString();
+            }
         }
 
         #endregion

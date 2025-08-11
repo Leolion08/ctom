@@ -81,5 +81,13 @@ namespace CTOM.Models.Entities
         /// </summary>
         [Column(TypeName = "nvarchar(max)")]
         public string? CalculationFormula { get; set; }
+
+        /// <summary>
+        /// [MỚI] Lưu trữ danh sách các vị trí mapping (dấu vân tay) dưới dạng chuỗi JSON.
+        /// Cột này sẽ chứa một mảng các đối tượng FieldPositionFingerprint.
+        /// Đây là thay đổi duy nhất cần thiết cho DB để đảm bảo lưu trữ bền vững.
+        /// </summary>
+        [Column(TypeName = "nvarchar(max)")]
+        public string? MappingPositionsJson { get; set; }
     }
 }

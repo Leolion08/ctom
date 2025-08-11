@@ -11,24 +11,6 @@
     var maxRows = ExcelImportConfig.Value.MaxRows;
 }
 
-@* Khu vực hiển thị thông báo từ ViewData/TempData *@
-<div id="notificationPlaceholder">
-    @if (ViewData["SuccessMessage"] != null)
-    {
-        <div class="alert alert-success alert-dismissible bg-success-lt" role="alert">
-            @ViewData["SuccessMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
-    @if (ViewData["ErrorMessage"] != null)
-    {
-        <div class="alert alert-danger alert-important alert-dismissible bg-yellow-lt" role="alert">
-            @ViewData["ErrorMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
-</div>
-
 <!-- Container cho thông báo từ AJAX -->
 <div id="ajaxNotifications" class="position-fixed top-0 end-0 p-3" style="z-index: 1100;"></div>
 

@@ -14,12 +14,13 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using System.Linq.Dynamic.Core;
 using System.Text.RegularExpressions;
 using System.Globalization;
-using System.Threading.Tasks; // Đảm bảo có using này
-using CTOM.Models.Entities; // Đảm bảo có using này
-using System.Linq; // Đảm bảo có using này
-using System; // Đảm bảo có using này
-using System.Collections.Generic; // Đảm bảo có using này
-using System.IO; // Đảm bảo có using này
+using System.Threading.Tasks;
+using CTOM.Models.Entities;
+using System.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
 
 namespace CTOM.Controllers;
 
@@ -56,7 +57,6 @@ public sealed class FormController(
         var templateOptions = await _formDataService.GetAvailableTemplateOptionsAsync();
         ViewData["TemplateOptions"] = templateOptions;
 
-        // Nếu có templateId, tạo preview HTML
         if (templateId.HasValue)
         {
             var template = await _db.Templates
@@ -92,7 +92,6 @@ public sealed class FormController(
 
         try
         {
-            // Validate TemplateId tồn tại
             bool templateExists = await _db.Templates.AnyAsync(t => t.TemplateID == vm.TemplateId && t.IsActive);
             if (!templateExists)
                 return BadRequest("Template không tồn tại hoặc đã bị khóa.");
@@ -110,10 +109,8 @@ public sealed class FormController(
                     f.IsRequired,
                     f.DataSourceType)).ToList();
 
-            // Ưu tiên SoCif đầu danh sách
             fields = fields.OrderBy(f => f.FieldName != "SoCif").ToList();
 
-            // Chuyển hướng sang trang Create với templateId để hiển thị HTML preview
             return Json(new { success = true, fields, redirectUrl = Url.Action("Create", new { templateId = vm.TemplateId }) });
         }
         catch (Exception ex)
@@ -201,7 +198,6 @@ public sealed class FormController(
     }
 
     // GET: /Form/Edit/5
-    // SỬA LỖI: Bổ sung logic tạo HTML preview cho trang Edit
     [HttpGet("Edit/{id:long}")]
     public async Task<IActionResult> Edit(long id)
     {
@@ -219,14 +215,11 @@ public sealed class FormController(
         var template = formData.Template;
         if (template == null)
         {
-            // Xử lý trường hợp template không tồn tại hoặc không được load
             TempData["ErrorMessage"] = "Không tìm thấy template liên kết với giao dịch này.";
             return RedirectToAction(nameof(Index));
         }
 
-        // --- LOGIC MỚI ĐỂ TẠO HTML PREVIEW ---
         var (htmlContent, hasFile) = await GenerateHtmlPreviewAsync(template);
-        // ------------------------------------
 
         string fullTemplateName = "Không xác định";
         var operationName = template.BusinessOperation?.OperationName ?? "N/A";
@@ -239,8 +232,8 @@ public sealed class FormController(
             Note = formData.Note,
             TemplateName = fullTemplateName,
             FormDataJson = formData.FormDataJson,
-            HtmlContent = htmlContent, // Truyền HTML sang View
-            HasFile = hasFile          // Truyền cờ có file sang View
+            HtmlContent = htmlContent,
+            HasFile = hasFile
         };
 
         if (TempData["SuccessMessage"] is not null)
@@ -257,9 +250,6 @@ public sealed class FormController(
         return View();
     }
 
-    /// <summary>
-    /// Lấy dữ liệu cho DataTables với logic chuẩn (lọc, sắp xếp, phân trang phía server).
-    /// </summary>
     [HttpPost("GetDataTable")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> GetDataTable([FromForm] DataTablesRequest dtRequest, [FromForm(Name = "q")] string? customSearch)
@@ -361,7 +351,7 @@ public sealed class FormController(
     }
 
     /**
-     * PHẦN THAY ĐỔI: Cập nhật Action Details để sinh HTML preview
+     * PHẦN THAY ĐỔI: Cập nhật Action Details để sinh HTML preview đã trộn dữ liệu
      */
     [HttpGet("Details/{id:long}")]
     public async Task<IActionResult> Details(long id)
@@ -381,14 +371,14 @@ public sealed class FormController(
             return RedirectToAction(nameof(Index));
         }
 
-        // THAY ĐỔI: Gọi hàm sinh HTML
-        var (htmlContent, hasFile) = await GenerateHtmlPreviewAsync(template);
+        // THAY ĐỔI: Gọi hàm sinh HTML ĐÃ ĐƯỢC TRỘN DỮ LIỆU thay vì HTML gốc
+        var mergedHtmlContent = await GenerateMergedHtmlAsync(formData);
+        var hasFile = !string.IsNullOrEmpty(mergedHtmlContent);
 
         string fullTemplateName = "Không xác định";
         var operationName = template.BusinessOperation?.OperationName ?? "N/A";
         fullTemplateName = $"{operationName} > {template.TemplateName} (ID: {template.TemplateID})";
 
-        // THAY ĐỔI: Truyền HTML vào ViewModel
         var vm = new FormEditViewModel
         {
             FormDataID = formData.FormDataID,
@@ -396,9 +386,16 @@ public sealed class FormController(
             Note = formData.Note,
             TemplateName = fullTemplateName,
             FormDataJson = formData.FormDataJson,
-            HtmlContent = htmlContent, // Gán nội dung HTML
-            HasFile = hasFile          // Gán cờ có file
+            HtmlContent = mergedHtmlContent, // Gán nội dung HTML đã trộn
+            HasFile = hasFile
         };
+        
+        if (template.LastModificationTimestamp.HasValue && 
+            template.LastModificationTimestamp.Value > formData.CreationTimestamp)
+        {
+            ViewData["ShowTemplateVersionWarning"] = true;
+        }
+
         return View("Details", vm);
     }
 
@@ -451,9 +448,6 @@ public sealed class FormController(
         }
     }
 
-    /// <summary>
-    /// GET: /Form/GetHtmlPreview
-    /// </summary>
     [HttpGet("GetHtmlPreview")]
     public async Task<IActionResult> GetHtmlPreview([FromQuery] int templateId)
     {
@@ -502,35 +496,29 @@ public sealed class FormController(
             return RedirectToAction(nameof(Index));
         }
 
-        // THAY ĐỔI: Gọi hàm sinh HTML preview
-        var (htmlContent, hasFile) = await GenerateHtmlPreviewAsync(template);
+        // === THAY ĐỔI: Gọi hàm sinh HTML đã được TRỘN DỮ LIỆU ===
+        // Thay vì gọi GenerateHtmlPreviewAsync, chúng ta gọi GenerateMergedHtmlAsync
+        // để lấy HTML có sẵn dữ liệu của giao dịch gốc.
+        var mergedHtmlContent = await GenerateMergedHtmlAsync(originalForm);
+        var hasFile = !string.IsNullOrEmpty(mergedHtmlContent);
 
         string fullTemplateName = "Không xác định";
         var operationName = template.BusinessOperation?.OperationName ?? "N/A";
         fullTemplateName = $"{operationName} > {template.TemplateName} (ID: {template.TemplateID})";
 
-        // THAY ĐỔI: Truyền HTML vào ViewModel
         var viewModel = new FormCopyViewModel
         {
             TemplateId = originalForm.TemplateID,
             TemplateName = fullTemplateName,
             Note = originalForm.Note,
             FormDataJson = originalForm.FormDataJson,
-            HtmlContent = htmlContent, // Gán nội dung HTML
-            HasFile = hasFile          // Gán cờ có file
+            HtmlContent = mergedHtmlContent, // Gán nội dung HTML đã trộn
+            HasFile = hasFile
         };
 
         return View("Copy", viewModel);
     }
 
-    /// <summary>
-    /// ACTION MỚI: Trả về HTML của một tài liệu đã được trộn dữ liệu.
-    /// Dùng cho chức năng "Xem tài liệu đã lưu" trong modal.
-    /// </summary>
-    /**
-     * PHẦN THAY ĐỔI: Sửa lại hoàn toàn logic thay thế placeholder để khắc phục lỗi lồng thẻ span.
-     * Logic mới đảm bảo việc thay thế được thực hiện một cách rõ ràng và chính xác.
-     */
     [HttpGet("GetMergedHtmlPreview/{id:long}")]
     public async Task<IActionResult> GetMergedHtmlPreview(long id)
     {
@@ -545,46 +533,14 @@ public sealed class FormController(
             {
                 return Json(new { success = false, message = "Không tìm thấy giao dịch hoặc template tương ứng." });
             }
+            
+            // THAY ĐỔI: Gọi hàm helper mới để lấy HTML đã trộn
+            var finalHtml = await GenerateMergedHtmlAsync(formData);
 
-            // 1. Lấy HTML gốc với các placeholder đã được chuyển thành span tương tác
-            var (baseHtml, hasFile) = await GenerateHtmlPreviewAsync(formData.Template);
-
-            if (!hasFile || string.IsNullOrEmpty(baseHtml))
+            if (string.IsNullOrEmpty(finalHtml))
             {
-                return Json(new { success = false, message = "Template không có file để xem trước." });
+                 return Json(new { success = false, message = "Template không có file để xem trước hoặc có lỗi xảy ra." });
             }
-
-            var savedData = JsonSerializer.Deserialize<Dictionary<string, string?>>(formData.FormDataJson ?? "{}", _jsonOptions) ?? new();
-            var fields = await _db.TemplateFields
-                .AsNoTracking()
-                .Where(f => f.TemplateID == formData.TemplateID)
-                .ToListAsync();
-
-            string finalHtml = baseHtml;
-
-            // 2. Tạo một biểu thức chính quy (Regex) để tìm tất cả các span placeholder trong một lần
-            var allPlaceholdersPattern = new Regex("<span class=\"placeholder-span[^\"]*\" data-placeholder-for=\"([^\"]+)\">.*?</span>", RegexOptions.IgnoreCase);
-
-            // 3. Sử dụng MatchEvaluator để xử lý logic thay thế cho mỗi placeholder tìm được
-            finalHtml = allPlaceholdersPattern.Replace(finalHtml, match =>
-            {
-                // Lấy tên trường từ kết quả regex
-                string fieldName = match.Groups[1].Value;
-
-                if (savedData.TryGetValue(fieldName, out var value) && !string.IsNullOrEmpty(value))
-                {
-                    // Ý NGHĨA: Nếu có dữ liệu, thay thế TOÀN BỘ thẻ span cũ bằng một thẻ span mới
-                    // với class "highlighted-merge" (nền xanh).
-                    string displayValue = FormatDisplayValue(value, fields.FirstOrDefault(f => f.FieldName == fieldName)?.DataType);
-                    return $"<span class=\"highlighted-merge\">{displayValue}</span>";
-                }
-                else
-                {
-                    // Ý NGHĨA: Nếu không có dữ liệu, thay thế TOÀN BỘ thẻ span cũ bằng một thẻ span mới
-                    // với class "placeholder-span" (nền vàng) và nội dung là <<TênTrường>>.
-                    return $"<span class=\"placeholder-span placeholder-empty\">{System.Net.WebUtility.HtmlEncode($"<<{fieldName}>>")}</span>";
-                }
-            });
 
             return Json(new { success = true, htmlContent = finalHtml });
         }
@@ -596,8 +552,7 @@ public sealed class FormController(
     }
 
     /// <summary>
-    /// Hàm helper để sinh HTML preview từ một template.
-    /// ĐÂY LÀ PHẦN ĐƯỢC CẢI TIẾN ĐỂ ĐỌC FILE AN TOÀN.
+    /// Hàm helper để sinh HTML preview của template GỐC (chưa trộn dữ liệu).
     /// </summary>
     private async Task<(string? htmlContent, bool hasFile)> GenerateHtmlPreviewAsync(Templates template)
     {
@@ -606,51 +561,79 @@ public sealed class FormController(
 
         try
         {
-            string? relativeFilePath = null;
-            if (template.Status?.Equals("Mapped", StringComparison.OrdinalIgnoreCase) == true && !string.IsNullOrEmpty(template.MappedDocxFilePath))
-            {
-                relativeFilePath = template.MappedDocxFilePath;
-            }
-            else if (!string.IsNullOrEmpty(template.OriginalDocxFilePath))
+            string? relativeFilePath = template.MappedDocxFilePath;
+            if (string.IsNullOrEmpty(relativeFilePath) || !_templateStorageService.FileExists(relativeFilePath))
             {
                 relativeFilePath = template.OriginalDocxFilePath;
             }
 
             if (!string.IsNullOrEmpty(relativeFilePath))
             {
-                // SỬA ĐỔI: Thay thế lệnh đọc file không an toàn bằng cách gọi service đã được tối ưu.
-                // Dòng code cũ: var docxBytes = await System.IO.File.ReadAllBytesAsync(fullPath);
                 var docxBytes = await _templateStorageService.GetFileBytesAsync(relativeFilePath);
-
                 if (docxBytes != null)
                 {
                     htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: true);
                     hasFile = true;
-                    _logger.LogInformation("Successfully converted DOCX to HTML for template {TemplateId}", template.TemplateID);
-                }
-                else
-                {
-                    _logger.LogWarning("Không thể đọc file template: {FilePath}", relativeFilePath);
-                    // Không cần gán htmlContent lỗi ở đây vì nơi gọi sẽ xử lý
                 }
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error converting DOCX to HTML for template {TemplateId}", template.TemplateID);
-            // Không gán htmlContent lỗi ở đây, trả về null để nơi gọi xử lý
         }
 
         return (htmlContent, hasFile);
     }
+    
+    /// <summary>
+    /// BỔ SUNG: Hàm helper mới để sinh HTML đã được TRỘN DỮ LIỆU.
+    /// </summary>
+    private async Task<string?> GenerateMergedHtmlAsync(FormData formData)
+    {
+        if (formData?.Template == null) return null;
+
+        // 1. Lấy HTML gốc của template.
+        var (baseHtml, hasFile) = await GenerateHtmlPreviewAsync(formData.Template);
+        if (!hasFile || string.IsNullOrEmpty(baseHtml))
+        {
+            return baseHtml; // Trả về null hoặc empty nếu template không có file.
+        }
+
+        // 2. Lấy dữ liệu đã lưu.
+        var savedData = JsonSerializer.Deserialize<Dictionary<string, string?>>(formData.FormDataJson ?? "{}", _jsonOptions) ?? new();
+        
+        // 3. Lấy định nghĩa các trường để biết kiểu dữ liệu (phục vụ format).
+        var fields = await _db.TemplateFields
+            .AsNoTracking()
+            .Where(f => f.TemplateID == formData.TemplateID)
+            .ToListAsync();
+
+        // 4. Thực hiện thay thế.
+        //    Placeholder trong HTML (với isViewMode: true) có dạng &lt;&lt;FieldName&gt;&gt;
+        var placeholderPattern = new Regex("&lt;&lt;([a-zA-Z0-9_]+)&gt;&gt;");
+        string finalHtml = placeholderPattern.Replace(baseHtml, match =>
+        {
+            string fieldName = match.Groups[1].Value;
+            if (savedData.TryGetValue(fieldName, out var value) && !string.IsNullOrEmpty(value))
+            {
+                string displayValue = FormatDisplayValue(value, fields.FirstOrDefault(f => f.FieldName == fieldName)?.DataType);
+                // THAY ĐỔI: Thêm data-placeholder-for vào cả trường hợp có dữ liệu
+                return $"<span class=\"highlighted-merge\" data-placeholder-for=\"{fieldName}\">{WebUtility.HtmlEncode(displayValue)}</span>";
+            }
+            else
+            {
+                // THAY ĐỔI: Thêm data-placeholder-for vào trường hợp rỗng
+                return $"<span class=\"placeholder-span placeholder-empty\" data-placeholder-for=\"{fieldName}\">{match.Value}</span>";
+            }
+        });
+
+        return finalHtml;
+    }
+
 
     /// <summary>
     /// Hàm helper để định dạng giá trị hiển thị dựa trên kiểu dữ liệu.
     /// </summary>
-    /**
-     * THAY ĐỔI: Cập nhật hàm FormatDisplayValue để sử dụng văn hóa en-US
-     * Giúp định dạng số theo kiểu 12,345.67
-     */
     private static string FormatDisplayValue(string value, string? dataType)
     {
         if (string.IsNullOrEmpty(value)) return "";
@@ -658,18 +641,11 @@ public sealed class FormController(
         switch (dataType?.ToUpperInvariant())
         {
             case "NUMBER":
-                // Dùng InvariantCulture để parse, đảm bảo '.' luôn là dấu thập phân
                 if (decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var num))
                 {
-                    // // Dùng "en-US" để định dạng với ',' cho hàng nghìn và '.' cho thập phân
-                    // return num.ToString("N", new CultureInfo("en-US")); //Mặc định N là N2
-
-                    // Phân tách phần nguyên & phần thập phân bằng chính số gốc
-                    // Hiển thị phần thập phân theo số lượng số thập phân trong số gốc
                     var parts = value.Split('.');
                     var decimalDigits = parts.Length == 2 ? parts[1].Length : 0;
                     var format = decimalDigits > 0 ? $"N{decimalDigits}" : "N0";
-
                     return num.ToString(format, new CultureInfo("en-US"));
                 }
                 return value;
@@ -685,5 +661,4 @@ public sealed class FormController(
                 return value;
         }
     }
-
 }

@@ -229,7 +229,7 @@ namespace CTOM.Services
             return Path.Combine(_environment.ContentRootPath, _settings.RootPath);
         }
 
-        private static string GetRelativePath(string userName, int businessOperationId, int? templateId, string fileExtension)
+        private static string GetRelativePath(string userName, int businessOperationId, int? templateId, string fileExtension, bool isMapped = false)
         {
             // Sử dụng tên người dùng thay vì ID để dễ nhận biết
             var safeUserName = Path.GetInvalidFileNameChars()
@@ -237,8 +237,9 @@ namespace CTOM.Services
 
             if (templateId.HasValue)
             {
-                // Định dạng: {UserName}/{BusinessOperationID}/{TemplateId}_original.docx
-                var fileName = $"{templateId}_original{fileExtension}";
+                // Định dạng: {UserName}/{BusinessOperationID}/{TemplateId}_original.docx hoặc _mapped.docx
+                var fileType = isMapped ? "mapped" : "original";
+                var fileName = $"{templateId}_{fileType}{fileExtension}";
                 return Path.Combine(safeUserName, businessOperationId.ToString(), fileName).Replace('\\', '/');
             }
             else
@@ -284,6 +285,30 @@ namespace CTOM.Services
                 _logger.LogError(ex, "Lỗi không xác định khi đọc file: {FilePath}", fullPath);
                 return null;
             }
+        }
+
+        public async Task<string> SaveMappedFileAsync(int templateId, byte[] fileContent, string userName, int businessOperationId)
+        {
+            var fileExtension = ".docx"; // Mapped files are always docx
+            var relativePath = GetRelativePath(userName, businessOperationId, templateId, fileExtension, isMapped: true);
+            var fullPath = GetFullPath(relativePath);
+            var directoryPath = Path.GetDirectoryName(fullPath);
+
+            if (string.IsNullOrEmpty(directoryPath))
+            {
+                throw new InvalidOperationException("Không thể xác định thư mục đích từ đường dẫn: " + relativePath);
+            }
+
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+                _logger.LogInformation("Created directory: {DirectoryPath}", directoryPath);
+            }
+
+            await File.WriteAllBytesAsync(fullPath, fileContent);
+            _logger.LogInformation("Saved mapped file to {FilePath}", fullPath);
+
+            return relativePath;
         }
     }
 }

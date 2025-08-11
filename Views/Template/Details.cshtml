@@ -1,10 +1,11 @@
 @model CTOM.ViewModels.Template.TemplateDetailsVM
-
+@using CTOM.Models.Settings
+@inject Microsoft.Extensions.Options.IOptions<TemplateSettings> TemplateSettingsOptions
 @{
     ViewData["Title"] = "Chi tiết Template";
     ViewData["ActivePage"] = "Quản lý Template";
+    var templateSettings = TemplateSettingsOptions.Value;
 }
-
 <!-- Read-only Details page (refactored) -->
 <div class="page-header d-print-none">
     <div class="container-xl">
@@ -93,7 +94,7 @@
             <div class="card-header py-2">
                 <h3 class="card-title mb-0">Nội dung tài liệu</h3>
             </div>
-            <div class="card-body p-0 d-flex flex-column">
+            <div id="document-preview" class="card-body p-0 d-flex flex-column">
                 @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
                 {
                     <div id="html-preview" class="document-preview">
@@ -115,20 +116,47 @@
 
 @section Styles {
     <link href="~/css/template/details.css" rel="stylesheet" />
+    <style>
+        @{
+            var maxNestingLevel = templateSettings.MaxTableNestingLevel;
+            var maxAllowedDepth = maxNestingLevel + 1;
+            var allowedBorderColors = new[] { "#28a745", "#0d6efd", "#6f42c1" };
+            var allowedBgColors = new[] { "#f8fff9", "#f4f8ff", "#f8f5ff" };
+        }
+        @for (var level = 0; level <= maxNestingLevel; level++)
+        {
+            var depth = level + 2;
+            if (level >= allowedBorderColors.Length) { continue; }
+            <text>
+            #document-preview .nested-table[data-nested-depth="@depth"] { border: 2px solid @(allowedBorderColors[level]) !important; background-color: @(allowedBgColors[level]) !important; }
+            #document-preview .nested-table[data-nested-depth="@depth"] td { background-color: @(allowedBgColors[level]) !important; }
+            </text>
+        }
+        @{
+            var disallowedSelectors = new List<string>();
+            for (int i = maxAllowedDepth + 1; i <= 10; i++) { disallowedSelectors.Add($"#document-preview .nested-table[data-nested-depth=\"{i}\"]"); }
+        }
+        @if(disallowedSelectors.Any())
+        {
+            <text>
+            @(string.Join(",\n", disallowedSelectors)) { border: 2px solid #dc3545 !important; background-color: #fff5f5 !important; }
+            @(string.Join(" td,\n", disallowedSelectors)) td { background-color: #fff5f5 !important; }
+            </text>
+        }
+    </style>
 }
 
 @section Scripts {
     @Html.AntiForgeryToken()
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Xử lý click nút Ánh xạ
+            // Handle click on the Mapping button
             const mappingBtn = document.getElementById('btnMapping');
             if (mappingBtn) {
                 mappingBtn.addEventListener('click', () => {
                     const templateId = mappingBtn.dataset.templateId;
                     if (!templateId) return;
 
-                    // Lấy token chống CSRF
                     const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
                     const token = tokenInput ? tokenInput.value : null;
 
@@ -147,16 +175,151 @@
                 });
             }
 
-            // Logic để highlight placeholder nếu là template đã mapped
-            const isMapped = '@Model.Status'.toLowerCase() === 'mapped';
-            if (isMapped) {
-                const container = document.getElementById('html-preview');
-                if (container) {
-                    // Highlight các placeholder đã có sẵn trong HTML từ backend
-                    // HTML đã được render với class 'mapped-field' từ DocxToStructuredHtmlService
-                    console.log('Template đã được mapped, các placeholder sẽ được highlight tự động.');
+            // [MỚI] Logic tái tạo placeholder phía client cho trang Details
+            const docPreview = document.getElementById('document-preview');
+            const mappedFieldsData = JSON.parse('@Html.Raw(Model.MappedFieldsJson)');
+
+            // --- Các hàm helper được sao chép từ Mapping.cshtml ---
+            const getParagraphTextAndAbsoluteOffset = (paragraph, startNode, startOffset) => {
+                let fullText = '';
+                let absoluteOffset = -1;
+                const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+                let currentNode;
+                while (currentNode = walker.nextNode()) {
+                    if (absoluteOffset === -1 && currentNode === startNode) {
+                        absoluteOffset = fullText.length + startOffset;
+                    }
+                    fullText += currentNode.textContent;
                 }
-            }
+                if (absoluteOffset === -1 && paragraph.contains(startNode)) {
+                    absoluteOffset = fullText.length;
+                }
+                return { fullText, absoluteOffset };
+            };
+
+            const findAbsoluteOffsetInText = (fullText, fingerprint) => {
+                if (fullText.trim().replace(/\u00A0/g, '') === '' && fingerprint.contextBeforeText === '' && fingerprint.contextAfterText === '') return 0;
+                let searchStr = fingerprint.contextBeforeText + fingerprint.contextAfterText;
+                if (searchStr) {
+                    let index = fullText.indexOf(searchStr);
+                    if (index !== -1) return index + fingerprint.contextBeforeText.length;
+                }
+                if(fingerprint.contextBeforeText) {
+                    let index = fullText.lastIndexOf(fingerprint.contextBeforeText);
+                    if(index !== -1) return index + fingerprint.contextBeforeText.length;
+                }
+                if(fingerprint.contextAfterText) {
+                    let index = fullText.indexOf(fingerprint.contextAfterText);
+                    if(index !== -1) return index;
+                }
+                if (fingerprint.contextBeforeText === '' && fingerprint.contextAfterText === '') return 0;
+                return -1;
+            };
+
+            const findNodeAndOffsetFromFingerprint = (paragraph, fingerprint) => {
+                if (fingerprint.paragraphHash === '' && !paragraph.textContent.trim().replace(/\u00A0/g, '')) {
+                    let textNode = Array.from(paragraph.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
+                    if (!textNode) {
+                        textNode = document.createTextNode('');
+                        paragraph.prepend(textNode);
+                    }
+                    return { node: textNode, offset: 0 };
+                }
+                const { fullText } = getParagraphTextAndAbsoluteOffset(paragraph, document.body, 0);
+                const absoluteOffset = findAbsoluteOffsetInText(fullText, fingerprint);
+                if (absoluteOffset === -1) return { node: null, offset: -1 };
+                const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+                let cumulativeOffset = 0;
+                let currentNode;
+                while (currentNode = walker.nextNode()) {
+                    const nodeLength = currentNode.textContent.length;
+                    if (cumulativeOffset + nodeLength >= absoluteOffset) {
+                        return { node: currentNode, offset: absoluteOffset - cumulativeOffset };
+                    }
+                    cumulativeOffset += nodeLength;
+                }
+                const allTextNodes = [];
+                const treeWalker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+                while(treeWalker.nextNode()) allTextNodes.push(treeWalker.currentNode);
+                const lastTextNode = allTextNodes.pop();
+                if(lastTextNode) return { node: lastTextNode, offset: lastTextNode.textContent.length };
+                return { node: null, offset: -1 };
+            };
+
+            // [SỬA LỖI] Cập nhật hàm này để chống lồng placeholder
+            const insertPlaceholderNode = (range, fieldName) => {
+                const placeholderEl = document.createElement('span');
+                placeholderEl.className = 'field-placeholder';
+                placeholderEl.textContent = `<<${fieldName}>>`;
+                
+                const startContainer = range.startContainer;
+                const existingPlaceholder = startContainer.nodeType === Node.TEXT_NODE 
+                    ? startContainer.parentElement.closest('.field-placeholder')
+                    : startContainer.closest('.field-placeholder');
+
+                range.deleteContents();
+
+                if (existingPlaceholder) {
+                    existingPlaceholder.after(placeholderEl);
+                } else {
+                    range.insertNode(placeholderEl);
+                }
+            };
+
+            const restorePlaceholdersOnUI = () => {
+                if (!Array.isArray(mappedFieldsData) || mappedFieldsData.length === 0) return;
+
+                const allParagraphs = Array.from(docPreview.querySelectorAll('p[data-paragraph-hash]'));
+
+                const findParagraphAndIndex = (fingerprint) => {
+                    if (fingerprint.paragraphHash && fingerprint.paragraphHash !== '') {
+                        const pIndex = allParagraphs.findIndex(p => p.dataset.paragraphHash === fingerprint.paragraphHash);
+                        if (pIndex !== -1) return { paragraph: allParagraphs[pIndex], index: pIndex };
+                    }
+                    if (fingerprint.structuralPath) {
+                        const el = docPreview.querySelector(`[data-docx-path="${fingerprint.structuralPath}"]`);
+                        if (el) {
+                            const targetP = el.closest('p[data-paragraph-hash]');
+                            if (targetP) {
+                                const pIndex = allParagraphs.indexOf(targetP);
+                                return { paragraph: targetP, index: pIndex };
+                            }
+                        }
+                    }
+                    return { paragraph: null, index: -1 };
+                };
+                
+                for (const field of mappedFieldsData) {
+                    const positions = field.positions || [];
+                    const sortedPositions = [...positions].sort((a, b) => {
+                        const posA = findParagraphAndIndex(a);
+                        const posB = findParagraphAndIndex(b);
+                        if (posB.index !== posA.index) return posB.index - posA.index;
+                        if (posA.index === -1) return 0;
+                        const pA = posA.paragraph;
+                        const { fullText: fullTextA } = getParagraphTextAndAbsoluteOffset(pA, document.body, 0);
+                        const insertionIndexA = findAbsoluteOffsetInText(fullTextA, a);
+                        const { fullText: fullTextB } = getParagraphTextAndAbsoluteOffset(pA, document.body, 0);
+                        const insertionIndexB = findAbsoluteOffsetInText(fullTextB, b);
+                        return insertionIndexB - insertionIndexA;
+                    });
+
+                    for (const fingerprint of sortedPositions) {
+                        const { paragraph: targetParagraph } = findParagraphAndIndex(fingerprint);
+                        if (targetParagraph) {
+                            const position = findNodeAndOffsetFromFingerprint(targetParagraph, fingerprint);
+                            if (position.node) {
+                                const range = document.createRange();
+                                range.setStart(position.node, position.offset);
+                                insertPlaceholderNode(range, field.fieldName);
+                            }
+                        }
+                    }
+                }
+            };
+
+            // Chạy hàm tái tạo
+            restorePlaceholdersOnUI();
         });
     </script>
 }

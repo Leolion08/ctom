@@ -21,23 +21,6 @@
 
 <div class="page-body">
     <div class="container-xl">
-        <div id="notificationPlaceholder">
-            @if (ViewData["SuccessMessage"] != null)
-            {
-                <div class="alert alert-success alert-dismissible bg-success-lt" role="alert">
-                    @ViewData["SuccessMessage"]
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            }
-            @if (ViewData["ErrorMessage"] != null)
-            {
-                <div class="alert alert-danger alert-important alert-dismissible bg-yellow-lt" role="alert">
-                    @ViewData["ErrorMessage"]
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            }
-        </div>
-
         <!-- THAY ĐỔI: Sử dụng cấu trúc layout 2 cột đồng nhất -->
         <div class="main-layout two-column">
             <!-- CỘT TRÁI: FORM NHẬP LIỆU -->
