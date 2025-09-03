@@ -26,10 +26,6 @@
                     <strong>Hướng dẫn:</strong> Click chọn vị trí trong tài liệu, sau đó bấm nút<button type="button" class="btn btn-sm btn-outline-primary ms-1" title="Chèn"><i class="ti ti-arrow-right"></i></button> để chèn thêm placeholder.<br>
                     <ul class="mb-0 mt-1">
                         <li>Không thể chỉnh sửa nội dung tài liệu gốc để đảm bảo ánh xạ chính xác.</li>
-                        @if (ViewData["MaxTableNestingLevel"] != null)
-                        {
-                            <li>Bảng lồng ghép tối đa @ViewData["MaxTableNestingLevel"] cấp.</li>
-                        }
                     </ul>
                 </div>
             </div>
@@ -195,36 +191,6 @@
 
 @section Styles {
     <link href="~/css/template/mapping.css" rel="stylesheet" />
-    <style>
-        /* CSS động để tô màu bảng lồng nhau (Không thay đổi) */
-        @{
-            var maxNestingLevel = (int)(ViewData["MaxTableNestingLevel"] ?? 1);
-            var maxAllowedDepth = maxNestingLevel + 1;
-            var allowedBorderColors = new[] { "#28a745", "#0d6efd", "#6f42c1" };
-            var allowedBgColors = new[] { "#f8fff9", "#f4f8ff", "#f8f5ff" };
-        }
-        @for (var level = 0; level <= maxNestingLevel; level++)
-        {
-            var depth = level + 2;
-            if (level >= allowedBorderColors.Length) { continue; }
-            <text>
-            #document-preview .nested-table[data-nested-depth="@depth"] { border: 2px solid @(allowedBorderColors[level]) !important; background-color: @(allowedBgColors[level]) !important; }
-            #document-preview .nested-table[data-nested-depth="@depth"] td { background-color: @(allowedBgColors[level]) !important; }
-            </text>
-        }
-        @{
-            var disallowedSelectors = new List<string>();
-            for (int i = maxAllowedDepth + 1; i <= 10; i++) { disallowedSelectors.Add($"#document-preview .nested-table[data-nested-depth=\"{i}\"]"); }
-        }
-        @if(disallowedSelectors.Any())
-        {
-            <text>
-            @(string.Join(",\n", disallowedSelectors)) { border: 2px solid #dc3545 !important; background-color: #fff5f5 !important; }
-            @(string.Join(" td,\n", disallowedSelectors)) td { background-color: #fff5f5 !important; }
-            </text>
-        }
-        #document-preview [data-mappable="true"]:hover { background-color: #e3f2fd !important; cursor: pointer; }
-    </style>
 }
 
 @section Scripts {
@@ -236,8 +202,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const App = {
         state: {
             templateId: @Model.TemplateId,
-            maxTableNestingLevel: @(ViewData["MaxTableNestingLevel"] ?? 1),
-            mappedFields: new Map(),
+            // [NÂNG CẤP] Đây là nguồn dữ liệu chính (source of truth), một mảng phẳng chứa tất cả các fingerprint.
+            mappedFieldsFingerprints: [], 
+            //maxTableNestingLevel: @(ViewData["MaxTableNestingLevel"] ?? 1),
+            //mappedFields: new Map(),
             insertedFields: new Set(),
             customFields: [],
             activeTab: 'cif',
@@ -256,15 +224,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // --- INIT & SETUP ---
         init() {
-            console.log("App initializing with Hybrid Fingerprinting & Full UI...");
+            console.log("App initializing with NEW Fingerprinting Logic...");
             this.bindElements();
             this.modal.init(); 
             this.setupEventListeners();
             this.protection.init();
             this.loadCustomFieldsFromAvailable();
             this.renderActiveTabList();
-            this.loadInitialMappings();
-            this.updateInsertedFieldsUI();
+            this.loadInitialMappings(); // [NÂNG CẤP] Logic tải lại mapping đã thay đổi
+            this.updateInsertedFieldsUI(); // [NÂNG CẤP] Logic render UI đã thay đổi
             this.initTooltips();
             console.log("App initialized successfully.");
         },
@@ -288,24 +256,26 @@ document.addEventListener('DOMContentLoaded', function () {
             this.state.customFields = allAvailableFields.filter(f => f.dataSourceType === 'FORM');
         },
 
+        // [NÂNG CẤP] Tải và khôi phục mapping từ dữ liệu fingerprint mới
         loadInitialMappings() {
             try {
-                const initialData = JSON.parse('@Html.Raw(Model.MappedFieldsJson)');
-                if (Array.isArray(initialData) && initialData.length > 0) {
-                    for (const field of initialData) {
-                        const positionsWithUiId = field.positions.map(p => ({...p, uiId: crypto.randomUUID() }));
-                        this.state.mappedFields.set(field.fieldName, {
-                            displayName: field.displayName,
-                            positions: positionsWithUiId
-                        });
-                        this.state.insertedFields.add(field.fieldName);
-                    }
+                const initialFingerprints = @Html.Raw(Model.MappedFieldsJson ?? "[]");
+                if (Array.isArray(initialFingerprints) && initialFingerprints.length > 0) {
+                    // Gán uiId để quản lý trên UI và lưu vào state chính
+                    this.state.mappedFieldsFingerprints = initialFingerprints.map(fp => ({
+                        ...fp,
+                        uiId: crypto.randomUUID() 
+                    }));
                     this.restorePlaceholdersOnUI();
                 }
-            } catch (error) { console.error("Lỗi khi khôi phục mapping:", error); }
+            } catch (error) { 
+                console.error("Lỗi khi khôi phục mapping:", error); 
+                this.state.mappedFieldsFingerprints = [];
+            }
         },
 
         setupEventListeners() {
+            // [GIỮ NGUYÊN] Các event listener chính
             document.body.addEventListener('click', this.handleGlobalClick.bind(this));
             
             this.elements.tabNav.addEventListener('click', (e) => {
@@ -323,13 +293,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
             this.elements.cifSearchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
             this.elements.customSearchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
+            
+            // [NÂNG CẤP] Sử dụng selectionchange để bắt vị trí con trỏ một cách đáng tin cậy hơn
+            this.elements.docPreview.addEventListener('keyup', () => this.saveLastSelection());
+            this.elements.docPreview.addEventListener('mouseup', () => this.saveLastSelection());
+            this.elements.docPreview.addEventListener('focus', () => this.saveLastSelection());
+        },
 
-            document.addEventListener('selectionchange', () => {
-                const selection = window.getSelection();
-                if (selection.rangeCount > 0 && this.elements.docPreview.contains(selection.anchorNode)) {
-                    this.state.lastSelection = selection.getRangeAt(0).cloneRange();
-                }
-            });
+        saveLastSelection() {
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && this.elements.docPreview.contains(selection.anchorNode)) {
+                this.state.lastSelection = selection.getRangeAt(0).cloneRange();
+            }
         },
         
         // --- UI RENDERING ---
@@ -362,6 +337,7 @@ document.addEventListener('DOMContentLoaded', function () {
             let iconClass = "ti ti-abc text-muted";
             if (dataTypeUpper.includes("DATE")) { iconClass = "ti ti-calendar-event text-danger"; }
             else if (dataTypeUpper.includes("NUMBER")) { iconClass = "ti ti-number-123 text-success"; }
+            else if (dataTypeUpper.includes("TEXTAREA")) { iconClass = "ti ti-forms text-info"; }
             
             const dataSourceBadge = field.dataSourceType ? `<span class="badge bg-${field.dataSourceType === 'CIF' ? 'primary' : 'yellow'}-lt d-block mt-1">${field.dataSourceType}</span>` : '';
 
@@ -385,21 +361,37 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>`;
         },
         
+        // [NÂNG CẤP] Render danh sách trường đã chèn từ mảng fingerprint
         updateInsertedFieldsUI() {
-            this.elements.insertedCount.textContent = this.state.insertedFields.size;
-            if (this.state.insertedFields.size === 0) {
+            // 1. Nhóm các fingerprint theo fieldName để đếm số lượng
+            const groupedByField = this.state.mappedFieldsFingerprints.reduce((acc, fp) => {
+                if (!acc[fp.fieldName]) {
+                    acc[fp.fieldName] = 0;
+                }
+                acc[fp.fieldName]++;
+                return acc;
+            }, {});
+
+            const insertedFieldNames = Object.keys(groupedByField);
+            this.elements.insertedCount.textContent = insertedFieldNames.length;
+
+            if (insertedFieldNames.length === 0) {
                 this.elements.insertedList.innerHTML = `<div class="p-4 text-center text-muted">Chưa có trường nào.</div>`;
                 return;
             }
+
+            // 2. Render HTML
             let html = '<div class="list-group list-group-flush">';
-            Array.from(this.state.insertedFields).sort().forEach(fieldName => {
-                const fieldData = this.state.mappedFields.get(fieldName);
-                const count = fieldData ? fieldData.positions.length : 0;
+            insertedFieldNames.sort().forEach(fieldName => {
+                const count = groupedByField[fieldName];
                 const fieldInfo = availableFieldsMap.get(fieldName);
                 const displayName = fieldInfo?.displayName || fieldName;
                 const dataType = fieldInfo?.dataType || 'TEXT';
                 const dataSourceType = fieldInfo?.dataSourceType || '';
-                const iconClass = (dataType.toUpperCase().includes('DATE')) ? 'ti ti-calendar-event text-danger' : (dataType.toUpperCase().includes('NUMBER')) ? 'ti ti-number-123 text-success' : 'ti ti-abc text-muted';
+                const iconClass = (dataType.toUpperCase().includes('DATE')) ? 'ti ti-calendar-event text-danger' 
+                : (dataType.toUpperCase().includes('NUMBER')) ? 'ti ti-number-123 text-success' 
+                : (dataType.toUpperCase().includes('TEXTAREA')) ? 'ti ti-forms text-info'
+                : 'ti ti-abc text-muted';
                 const dataSourceBadge = dataSourceType ? `<span class="badge bg-${dataSourceType === 'CIF' ? 'primary' : 'yellow'}-lt d-block mt-1">${dataSourceType}</span>` : '';
 
                 html += `
@@ -536,59 +528,46 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             
             const range = this.state.lastSelection;
-            const fingerprint = this.createFingerprintFromRange(range);
+            const fingerprint = this.createFingerprintFromRange(range, fieldName);
             
             if (!fingerprint) {
                 this.modal.show({ title: 'Lỗi', message: 'Không thể tạo "dấu vân tay" cho vị trí này. Vui lòng thử lại ở vị trí khác.', type: 'danger' });
                 return;
             }
 
-            const maxAllowedDepth = this.state.maxTableNestingLevel + 1;
-            if (fingerprint.nestedDepth > maxAllowedDepth) {
-                const nestingLevelText = this.state.maxTableNestingLevel == 0 ? "bảng cha" : `bảng lồng tối đa ${this.state.maxTableNestingLevel} cấp`;
-                this.modal.show({ title: 'Lỗi', message: `Không thể mapping vào bảng lồng quá sâu. Hệ thống chỉ cho phép mapping vào ${nestingLevelText}.`, type: 'warning' });
-                return;
-            }
+            // Thêm fingerprint vào mảng state
+            this.state.mappedFieldsFingerprints.push(fingerprint);
 
-            if (!this.state.mappedFields.has(fieldName)) {
-                this.state.mappedFields.set(fieldName, { displayName: displayName, positions: [] });
-            }
-            this.state.mappedFields.get(fieldName).positions.push(fingerprint);
-            this.state.insertedFields.add(fieldName);
-
+            // Chèn node vào UI
             this.insertPlaceholderNode(range, fieldName, displayName, fingerprint.uiId);
+            
+            // Cập nhật lại danh sách bên phải
             this.updateInsertedFieldsUI();
             this.initTooltips();
         },
 
+        // [NÂNG CẤP] Xóa một placeholder cụ thể
         handleRemovePlaceholder(placeholderElement) {
-            const fieldName = placeholderElement.dataset.fieldName;
             const uiId = placeholderElement.dataset.uiId;
-
-            const fieldData = this.state.mappedFields.get(fieldName);
-            if (fieldData && uiId) {
-                fieldData.positions = fieldData.positions.filter(p => p.uiId !== uiId);
-                if (fieldData.positions.length === 0) {
-                    this.state.mappedFields.delete(fieldName);
-                    this.state.insertedFields.delete(fieldName);
-                }
+            if (uiId) {
+                // Lọc mảng state để loại bỏ fingerprint có uiId tương ứng
+                this.state.mappedFieldsFingerprints = this.state.mappedFieldsFingerprints.filter(p => p.uiId !== uiId);
             }
             
             const parent = placeholderElement.parentElement;
             placeholderElement.remove();
-            parent.normalize();
+            parent.normalize(); // Gộp các text node lại nếu có
             this.updateInsertedFieldsUI();
         },
         
+        // [NÂNG CẤP] Xóa tất cả các lần chèn của một trường, hoặc xóa tất cả
         removeField(fieldName, clearAll = false) {
             if (clearAll) {
                 this.elements.docPreview.querySelectorAll('.field-placeholder').forEach(el => el.remove());
-                this.state.insertedFields.clear();
-                this.state.mappedFields.clear();
+                this.state.mappedFieldsFingerprints = [];
             } else if (fieldName) {
                 this.elements.docPreview.querySelectorAll(`.field-placeholder[data-field-name="${fieldName}"]`).forEach(el => el.remove());
-                this.state.insertedFields.delete(fieldName);
-                this.state.mappedFields.delete(fieldName);
+                this.state.mappedFieldsFingerprints = this.state.mappedFieldsFingerprints.filter(fp => fp.fieldName !== fieldName);
             }
             this.updateInsertedFieldsUI();
         },
@@ -600,106 +579,320 @@ document.addEventListener('DOMContentLoaded', function () {
                 type: 'primary',
                 confirmText: 'Đồng ý',
                 showCancel: true,
-                onConfirm: () => {
-                    // [SỬA ĐỔI] Tách hàm xử lý async ra để tránh lỗi
-                    const performSave = async () => {
-                        this.state.loadingModal.show();
-                        
-                        const fieldsPayload = [];
-                        for (const [fieldName, fieldData] of this.state.mappedFields.entries()) {
-                            const availableField = allAvailableFields.find(f => f.name === fieldName);
-                            fieldsPayload.push({
-                                fieldName: fieldName,
-                                displayName: fieldData.displayName,
-                                positions: fieldData.positions,
-                                dataType: availableField?.dataType,
-                                isRequired: availableField?.isRequired || false,
-                                dataSourceType: availableField?.dataSourceType,
-                            });
+                onConfirm: async () => {
+                    // This callback now runs *after* the confirmation modal is hidden.
+                    this.state.loadingModal.show();
+                    
+                    const mappedFieldNames = [...new Set(this.state.mappedFieldsFingerprints.map(f => f.fieldName))];
+                    
+                    const fieldsInfo = mappedFieldNames.map(fieldName => {
+                        const field = availableFieldsMap.get(fieldName);
+                        if (field) {
+                            return {
+                                Name: field.name,
+                                DataType: field.dataType || 'TEXT',
+                                DataSourceType: field.dataSourceType || 'FORM',
+                                DisplayName: field.displayName || field.name,
+                                DisplayOrder: field.displayOrder || 0
+                            };
                         }
-                        const requestPayload = { templateId: this.state.templateId, fields: fieldsPayload };
-                        
-                        try {
-                            const response = await fetch('@Url.Action("SaveMapping", "Template")', {
-                                method: 'POST',
-                                headers: { 
-                                    'Content-Type': 'application/json',
-                                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                                },
-                                body: JSON.stringify(requestPayload)
-                            });
-                            
-                            const result = await response.json();
-                            
-                            // [SỬA ĐỔI] Chờ modal loading ẩn đi rồi mới hiện modal kết quả
-                            const loadingModalEl = document.getElementById('loadingModal');
-                            loadingModalEl.addEventListener('hidden.bs.modal', () => {
-                                if (response.ok && result.success) {
-                                    this.modal.show({
-                                        title: 'Thành công',
-                                        message: result.message,
-                                        type: 'success'
-                                    });
-                                } else {
-                                    this.modal.show({
-                                        title: 'Lỗi',
-                                        message: result.message || 'Lưu thất bại.',
-                                        type: 'danger'
-                                    });
-                                }
-                            }, { once: true }); // Quan trọng: chỉ lắng nghe sự kiện một lần
-
-                        } catch (error) {
-                             // [SỬA ĐỔI] Xử lý lỗi tương tự
-                            const loadingModalEl = document.getElementById('loadingModal');
-                            loadingModalEl.addEventListener('hidden.bs.modal', () => {
-                                this.modal.show({
-                                    title: 'Lỗi nghiêm trọng',
-                                    message: 'Đã có lỗi xảy ra: ' + error.message,
-                                    type: 'danger'
-                                });
-                            }, { once: true });
-                        } finally {
-                            this.state.loadingModal.hide();
-                        }
+                        return null;
+                    }).filter(Boolean);
+                    
+                    const requestPayload = {
+                        templateId: this.state.templateId,
+                        fingerprints: this.state.mappedFieldsFingerprints.map(({ uiId, ...rest }) => rest),
+                        fields: fieldsInfo
                     };
                     
-                    performSave();
+                    try {
+                        const response = await fetch('@Url.Action("SaveMapping", "Template")', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                            },
+                            body: JSON.stringify(requestPayload)
+                        });
+                        
+                        const result = await response.json();
+
+                        await new Promise(resolve => {
+                            const loadingModalEl = document.getElementById('loadingModal');
+                            loadingModalEl.addEventListener('hidden.bs.modal', resolve, { once: true });
+                            this.state.loadingModal.hide();
+                        });
+                        
+                        if (response.ok && result.success) {
+                            this.modal.show({ title: 'Thành công', message: result.message, type: 'success', isNotification: true });
+                        } else {
+                            this.modal.show({ title: 'Lỗi', message: result.message || 'Lưu thất bại.', type: 'danger', isNotification: true });
+                        }
+
+                    } catch (error) {
+                        await new Promise(resolve => {
+                            const loadingModalEl = document.getElementById('loadingModal');
+                            loadingModalEl.addEventListener('hidden.bs.modal', resolve, { once: true });
+                            this.state.loadingModal.hide();
+                        });
+
+                        this.modal.show({ title: 'Lỗi nghiêm trọng', message: 'Đã có lỗi xảy ra: ' + error.message, type: 'danger', isNotification: true });
+                    }
                 }
             });
         },
 
-        // --- FINGERPRINTING HELPERS ---
-        createFingerprintFromRange(range) {
-            let { container, offset } = this.normalizeRangeStart(range);
-            if (!container) return null;
+        // --- FINGERPRINTING HELPERS (HOÀN TOÀN MỚI) ---
 
-            const parentElement = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
-            if (!parentElement) return null;
+        /**
+         * [CỐT LÕI MỚI] Tạo đối tượng FieldPositionFingerprint tại vị trí con trỏ.
+         */
+        createFingerprintFromRange(range, fieldName) {
+            const startNode = range.startContainer;
 
-            const runSpan = parentElement.closest('span[data-docx-path]');
-            const paragraph = parentElement.closest('p[data-paragraph-hash]');
-            if (!paragraph) return null;
+            let pElement = startNode;
+            if (pElement.nodeType !== Node.ELEMENT_NODE) {
+                pElement = pElement.parentElement;
+            }
+            while (pElement && pElement.tagName !== 'P') {
+                pElement = pElement.parentElement;
+            }
 
-            const paragraphHash = paragraph.dataset.paragraphHash;
-            const structuralPath = runSpan ? runSpan.dataset.docxPath : paragraph.dataset.docxPath;
-            const nestedDepth = parseInt(paragraph.dataset.nestedDepth || '0', 10);
+            if (!pElement || !pElement.dataset.paragraphId) {
+                console.error("Con trỏ không nằm trong một paragraph hợp lệ (thiếu data-paragraph-id).", startNode);
+                return null;
+            }
 
-            const { fullText, absoluteOffset } = this.getParagraphTextAndAbsoluteOffset(paragraph, container, offset);
+            const paragraphId = pElement.dataset.paragraphId;
+            const partUri = pElement.dataset.partUri;
 
-            const contextChars = 20;
-            const contextBeforeText = fullText.substring(Math.max(0, absoluteOffset - contextChars), absoluteOffset);
-            const contextAfterText = fullText.substring(absoluteOffset, absoluteOffset + contextChars);
+            // Tính độ sâu bảng lồng: đọc từ phần tử tổ tiên .nested-table gần nhất
+            let nestedDepth = 0;
+            const nearestTable = pElement.closest && pElement.closest('.nested-table');
+            if (nearestTable && nearestTable.dataset && typeof nearestTable.dataset.nestedDepth !== 'undefined') {
+                const parsed = parseInt(nearestTable.dataset.nestedDepth, 10);
+                if (!Number.isNaN(parsed)) nestedDepth = parsed;
+            }
+
+            // Chuẩn hóa caret về TEXT_NODE gần nhất để tránh trường hợp caret nằm giữa các NODE phần tử
+            const { container: normNode, offset: normOffset } = this.normalizeRangeStart(range);
+            // Tính offset tuyệt đối và fullText, BỎ QUA text nằm trong .field-placeholder
+            const { fullText, absoluteOffset } = this.getParagraphTextAndAbsoluteOffsetExcludingPlaceholders(pElement, normNode, normOffset);
+            const offsetInParagraph = absoluteOffset;
+            
+            const contextBeforeText = fullText.substring(Math.max(0, offsetInParagraph - 20), offsetInParagraph);
+            const contextAfterText = fullText.substring(offsetInParagraph, offsetInParagraph + 20);
+
+            // Gán tie-breaker theo vị trí caret so với các placeholder đã có cùng paragraphId + offsetInParagraph
+            const siblingsAtSameSpot = this.state.mappedFieldsFingerprints.filter(fp => fp.paragraphId === paragraphId && fp.offsetInParagraph === offsetInParagraph);
+
+            let offsetTieBreaker = 0;
+            if (siblingsAtSameSpot.length === 0) {
+                offsetTieBreaker = 0;
+            } else {
+                // Ghép cặp placeholder DOM với tie-breaker để so vị trí
+                const pairs = siblingsAtSameSpot
+                    .map(fp => ({ el: this.elements.docPreview.querySelector(`.field-placeholder[data-ui-id="${fp.uiId}"]`), tb: fp.offsetTieBreaker }))
+                    .filter(p => !!p.el && typeof p.tb === 'number');
+
+                // Phân loại theo vị trí so với caret
+                const left = [];
+                const right = [];
+                for (const p of pairs) {
+                    const phRange = document.createRange();
+                    phRange.setStartBefore(p.el);
+                    phRange.collapse(true);
+                    const cmp = range.compareBoundaryPoints(Range.START_TO_START, phRange);
+                    if (cmp > 0) left.push(p);      // caret sau placeholder => placeholder ở bên trái caret
+                    else right.push(p);             // caret trước/đúng vị trí => placeholder ở bên phải hoặc trùng
+                }
+
+                const maxLeft = left.length ? Math.max(...left.map(p => p.tb)) : null;
+                const minRight = right.length ? Math.min(...right.map(p => p.tb)) : null;
+
+                if (maxLeft !== null && minRight !== null) {
+                    // Chèn lọt giữa hai bên: lấy trung điểm
+                    offsetTieBreaker = (maxLeft + minRight) / 2;
+                    // Nếu vô tình trùng do precision, nới nhẹ 1e-6
+                    if (offsetTieBreaker === maxLeft || offsetTieBreaker === minRight) offsetTieBreaker = maxLeft + (minRight - maxLeft) / 2 + 1e-6;
+                } else if (maxLeft !== null) {
+                    // Không có bên phải: append sau cùng
+                    offsetTieBreaker = maxLeft + 1;
+                } else if (minRight !== null) {
+                    // Không có bên trái: chèn trước cùng
+                    offsetTieBreaker = minRight - 1;
+                } else {
+                    // Không tìm thấy DOM (hiếm): fallback dựa trên danh sách hiện có
+                    const existingTbs = siblingsAtSameSpot
+                        .map(fp => typeof fp.offsetTieBreaker === 'number' ? fp.offsetTieBreaker : null)
+                        .filter(v => v !== null);
+                    if (existingTbs.length) {
+                        offsetTieBreaker = Math.max(...existingTbs) + 1;
+                    } else {
+                        offsetTieBreaker = 0;
+                    }
+                }
+            }
 
             return {
-                uiId: crypto.randomUUID(),
-                paragraphHash,
-                contextBeforeText,
-                contextAfterText,
-                charOffsetInRun: offset,
-                structuralPath,
-                nestedDepth
+                uiId: crypto.randomUUID(), // ID tạm thời để quản lý trên UI
+                fieldName: fieldName,
+                partUri: partUri,
+                paragraphId: paragraphId,
+                offsetInParagraph: offsetInParagraph,
+                offsetTieBreaker: offsetTieBreaker,
+                nestedDepth: nestedDepth,
+                contextBeforeText: contextBeforeText,
+                contextAfterText: contextAfterText
             };
+        },
+
+        /**
+         * [CỐT LÕI MỚI] Tính toán vị trí offset của con trỏ trong văn bản thuần túy của paragraph.
+         */
+        calculateOffsetInParagraph(parentElement, range) {
+            const { startContainer, startOffset } = range;
+            let accumulatedOffset = 0;
+            let foundCaret = false;
+
+            function traverseNodes(node) {
+                if (foundCaret) return;
+
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node === startContainer) {
+                        accumulatedOffset += startOffset;
+                        foundCaret = true;
+                    } else {
+                        accumulatedOffset += node.textContent.length;
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains('field-placeholder')) {
+                    for (const childNode of node.childNodes) {
+                        traverseNodes(childNode);
+                        if (foundCaret) break;
+                    }
+                }
+            }
+
+            traverseNodes(parentElement);
+            return accumulatedOffset;
+        },
+
+        insertPlaceholderNode(range, fieldName, displayName, uiId) {
+            // [GIỮ NGUYÊN] Logic tạo và chèn node span vào DOM
+            const placeholderEl = document.createElement('span');
+            placeholderEl.className = 'field-placeholder';
+            placeholderEl.contentEditable = 'false';
+            placeholderEl.dataset.fieldName = fieldName;
+            placeholderEl.dataset.uiId = uiId;
+            placeholderEl.textContent = `<<${fieldName}>>`;
+            placeholderEl.dataset.bsToggle = 'tooltip';
+            placeholderEl.title = `Click để xóa Field: ${displayName || fieldName}`;
+
+            range.deleteContents();
+            range.insertNode(placeholderEl);
+            
+            const selection = window.getSelection();
+            range.setStartAfter(placeholderEl);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            this.state.lastSelection = range.cloneRange();
+        },
+
+        // [NÂNG CẤP] Khôi phục lại các placeholder trên UI từ mảng fingerprint
+        restorePlaceholdersOnUI() {
+            // 1. Nhóm các fingerprint theo paragraphId để xử lý hiệu quả
+            const fingerprintsByParagraph = this.state.mappedFieldsFingerprints.reduce((acc, fp) => {
+                if (!acc[fp.paragraphId]) {
+                    acc[fp.paragraphId] = [];
+                }
+                acc[fp.paragraphId].push(fp);
+                return acc;
+            }, {});
+
+            // 2. Duyệt qua từng paragraph có fingerprint
+            for (const paragraphId in fingerprintsByParagraph) {
+                const targetParagraph = this.elements.docPreview.querySelector(`p[data-paragraph-id="${paragraphId}"]`);
+                if (!targetParagraph) {
+                    console.warn("Không tìm thấy paragraph để khôi phục:", paragraphId);
+                    continue;
+                }
+
+                // 3. Sắp xếp các fingerprint trong paragraph theo:
+                //    3.1 offset GIẢM DẦN (để chèn từ cuối lên đầu)
+                //    3.2 tie-breaker GIẢM DẦN cho các fingerprint cùng offset (đảm bảo kết quả cuối cùng theo thứ tự tăng dần tie-breaker)
+                const sortedFingerprints = fingerprintsByParagraph[paragraphId]
+                    .slice()
+                    .sort((a, b) => {
+                        if (b.offsetInParagraph !== a.offsetInParagraph) return b.offsetInParagraph - a.offsetInParagraph;
+                        const tbA = (typeof a.offsetTieBreaker === 'number') ? a.offsetTieBreaker : Number.NEGATIVE_INFINITY;
+                        const tbB = (typeof b.offsetTieBreaker === 'number') ? b.offsetTieBreaker : Number.NEGATIVE_INFINITY;
+                        return tbB - tbA; // chèn cái có tie-breaker lớn trước
+                    });
+                
+                // 4. Chèn từng placeholder
+                for (const fingerprint of sortedFingerprints) {
+                    const position = this.findNodeAndOffsetFromAbsolute(targetParagraph, fingerprint.offsetInParagraph);
+                    if (position.node) {
+                        const range = document.createRange();
+                        range.setStart(position.node, position.offset);
+                        const fieldInfo = availableFieldsMap.get(fingerprint.fieldName);
+                        this.insertPlaceholderNode(range, fingerprint.fieldName, fieldInfo?.displayName || fingerprint.fieldName, fingerprint.uiId);
+                    } else {
+                        console.warn("Không tìm thấy vị trí node để khôi phục placeholder:", fingerprint);
+                    }
+                }
+            }
+        },
+
+        /**
+         * [CỐT LÕI MỚI] Tìm node và vị trí offset trong node đó từ một vị trí offset tuyệt đối trong paragraph.
+         */
+        findNodeAndOffsetFromAbsolute(paragraph, absoluteOffset) {
+            const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => {
+                    // Bỏ qua text nằm bên trong placeholder để vị trí không bị lệch
+                    if (node.parentElement && node.parentElement.closest && node.parentElement.closest('.field-placeholder')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            let cumulativeOffset = 0;
+            let currentNode;
+            while (currentNode = walker.nextNode()) {
+                const nodeLength = currentNode.textContent.length;
+                if (cumulativeOffset + nodeLength >= absoluteOffset) {
+                    const offsetInNode = absoluteOffset - cumulativeOffset;
+                    return { node: currentNode, offset: offsetInNode };
+                }
+                cumulativeOffset += nodeLength;
+            }
+            
+            // Fallback: nếu offset nằm ở cuối cùng
+            const allTextNodes = [];
+            const treeWalker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => {
+                    if (node.parentElement && node.parentElement.closest && node.parentElement.closest('.field-placeholder')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            while(treeWalker.nextNode()) allTextNodes.push(treeWalker.currentNode);
+            const lastTextNode = allTextNodes.length > 0 ? allTextNodes[allTextNodes.length - 1] : null;
+            if(lastTextNode) {
+                 return { node: lastTextNode, offset: lastTextNode.textContent.length };
+            }
+
+            // Fallback cho paragraph hoàn toàn trống
+            if (!paragraph.hasChildNodes()) {
+                const emptyTextNode = document.createTextNode('');
+                paragraph.appendChild(emptyTextNode);
+                return { node: emptyTextNode, offset: 0 };
+            }
+
+            return { node: paragraph.childNodes[paragraph.childNodes.length - 1], offset: (paragraph.childNodes[paragraph.childNodes.length - 1].textContent || '').length };
         },
         
         normalizeRangeStart(range) {
@@ -728,13 +921,21 @@ document.addEventListener('DOMContentLoaded', function () {
             return { container, offset };
         },
 
-        getParagraphTextAndAbsoluteOffset(paragraph, startNode, startOffset) {
+        getParagraphTextAndAbsoluteOffsetExcludingPlaceholders(paragraph, startNode, startOffset) {
             let fullText = '';
             let absoluteOffset = -1;
-            
-            const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+
+            const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => {
+                    // Loại trừ text nằm bên trong placeholder
+                    if (node.parentElement && node.parentElement.closest && node.parentElement.closest('.field-placeholder')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+
             let currentNode;
-            
             while (currentNode = walker.nextNode()) {
                 if (absoluteOffset === -1 && currentNode === startNode) {
                     absoluteOffset = fullText.length + startOffset;
@@ -742,172 +943,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 fullText += currentNode.textContent;
             }
 
+            // Nếu không khớp đúng node bắt đầu (trường hợp hiếm), chốt về cuối fullText
             if (absoluteOffset === -1 && paragraph.contains(startNode)) {
-                 absoluteOffset = fullText.length;
+                absoluteOffset = fullText.length;
             }
 
             return { fullText, absoluteOffset };
         },
         
-        insertPlaceholderNode(range, fieldName, displayName, uiId) {
-            const placeholderEl = document.createElement('span');
-            placeholderEl.className = 'field-placeholder';
-            placeholderEl.contentEditable = 'false';
-            placeholderEl.dataset.fieldName = fieldName;
-            placeholderEl.dataset.uiId = uiId;
-            placeholderEl.textContent = `<<${fieldName}>>`;
-            placeholderEl.dataset.bsToggle = 'tooltip';
-            placeholderEl.title = `Click để xóa Field: ${displayName || fieldName}`;
-
-            const startContainer = range.startContainer;
-            const existingPlaceholder = startContainer.nodeType === Node.TEXT_NODE 
-                ? startContainer.parentElement.closest('.field-placeholder')
-                : startContainer.closest('.field-placeholder');
-
-            range.deleteContents();
-
-            if (existingPlaceholder) {
-                existingPlaceholder.after(placeholderEl);
-            } else {
-                range.insertNode(placeholderEl);
-            }
-            
-            const selection = window.getSelection();
-            range.setStartAfter(placeholderEl);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        },
-
-        restorePlaceholdersOnUI() {
-            const allParagraphs = Array.from(this.elements.docPreview.querySelectorAll('p[data-paragraph-hash]'));
-
-            const findParagraphAndIndex = (fingerprint) => {
-                if (fingerprint.paragraphHash && fingerprint.paragraphHash !== '') {
-                    const pIndex = allParagraphs.findIndex(p => p.dataset.paragraphHash === fingerprint.paragraphHash);
-                    if (pIndex !== -1) {
-                        return { paragraph: allParagraphs[pIndex], index: pIndex };
-                    }
-                }
-                if (fingerprint.structuralPath) {
-                    const el = this.elements.docPreview.querySelector(`[data-docx-path="${fingerprint.structuralPath}"]`);
-                    if (el) {
-                        const targetP = el.closest('p[data-paragraph-hash]');
-                        if (targetP) {
-                            const pIndex = allParagraphs.indexOf(targetP);
-                            return { paragraph: targetP, index: pIndex };
-                        }
-                    }
-                }
-                return { paragraph: null, index: -1 };
-            };
-            
-            for (const [fieldName, fieldData] of this.state.mappedFields.entries()) {
-                const sortedPositions = [...fieldData.positions].sort((a, b) => {
-                    const posA = findParagraphAndIndex(a);
-                    const posB = findParagraphAndIndex(b);
-
-                    if (posB.index !== posA.index) return posB.index - posA.index;
-
-                    if (posA.index === -1) return 0;
-                    const pA = posA.paragraph;
-
-                    const { fullText: fullTextA } = this.getParagraphTextAndAbsoluteOffset(pA, document.body, 0);
-                    const insertionIndexA = this.findAbsoluteOffsetInText(fullTextA, a);
-
-                    const { fullText: fullTextB } = this.getParagraphTextAndAbsoluteOffset(pA, document.body, 0);
-                    const insertionIndexB = this.findAbsoluteOffsetInText(fullTextB, b);
-
-                    return insertionIndexB - insertionIndexA;
-                });
-
-                for (const fingerprint of sortedPositions) {
-                    const { paragraph: targetParagraph } = findParagraphAndIndex(fingerprint);
-
-                    if (targetParagraph) {
-                        const position = this.findNodeAndOffsetFromFingerprint(targetParagraph, fingerprint);
-                        if (position.node) {
-                            const range = document.createRange();
-                            range.setStart(position.node, position.offset);
-                            this.insertPlaceholderNode(range, fieldName, fieldData.displayName, fingerprint.uiId);
-                        } else {
-                            console.warn("Không tìm thấy vị trí node để khôi phục placeholder:", fieldName, fingerprint);
-                        }
-                    } else {
-                         console.warn("Không tìm thấy paragraph để khôi phục placeholder:", fieldName, fingerprint);
-                    }
-                }
-            }
-        },
         
-        findAbsoluteOffsetInText(fullText, fingerprint) {
-            if (fullText.trim().replace(/\u00A0/g, '') === '' && fingerprint.contextBeforeText === '' && fingerprint.contextAfterText === '') {
-                return 0;
-            }
-            let searchStr = fingerprint.contextBeforeText + fingerprint.contextAfterText;
-            if (searchStr) {
-                let index = fullText.indexOf(searchStr);
-                if (index !== -1) {
-                    return index + fingerprint.contextBeforeText.length;
-                }
-            }
-            if(fingerprint.contextBeforeText) {
-                let index = fullText.lastIndexOf(fingerprint.contextBeforeText);
-                if(index !== -1) return index + fingerprint.contextBeforeText.length;
-            }
-            if(fingerprint.contextAfterText) {
-                let index = fullText.indexOf(fingerprint.contextAfterText);
-                if(index !== -1) return index;
-            }
-            if (fingerprint.contextBeforeText === '' && fingerprint.contextAfterText === '') {
-                return 0;
-            }
-            return -1;
-        },
-
-        findNodeAndOffsetFromFingerprint(paragraph, fingerprint) {
-            if (fingerprint.paragraphHash === '' && !paragraph.textContent.trim().replace(/\u00A0/g, '')) {
-                let textNode = Array.from(paragraph.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
-                if (!textNode) {
-                    textNode = document.createTextNode('');
-                    paragraph.prepend(textNode);
-                }
-                return { node: textNode, offset: 0 };
-            }
-
-            const { fullText } = this.getParagraphTextAndAbsoluteOffset(paragraph, document.body, 0);
-            const absoluteOffset = this.findAbsoluteOffsetInText(fullText, fingerprint);
-            
-            if (absoluteOffset === -1) {
-                console.warn("Không tìm thấy vị trí bằng context trong paragraph có nội dung.", fingerprint);
-                return { node: null, offset: -1 };
-            }
-
-            const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
-            let cumulativeOffset = 0;
-            let currentNode;
-            while (currentNode = walker.nextNode()) {
-                const nodeLength = currentNode.textContent.length;
-                if (cumulativeOffset + nodeLength >= absoluteOffset) {
-                    const offsetInNode = absoluteOffset - cumulativeOffset;
-                    return { node: currentNode, offset: offsetInNode };
-                }
-                cumulativeOffset += nodeLength;
-            }
-
-            const allTextNodes = [];
-            const treeWalker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
-            while(treeWalker.nextNode()) allTextNodes.push(treeWalker.currentNode);
-            
-            const lastTextNode = allTextNodes.pop();
-
-            if(lastTextNode) {
-                 return { node: lastTextNode, offset: lastTextNode.textContent.length };
-            }
-
-            return { node: null, offset: -1 };
-        },
-
         // --- UTILITIES ---
         initTooltips() {
             const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -935,6 +979,9 @@ document.addEventListener('DOMContentLoaded', function () {
             cancelBtn: null,
             onConfirmCallback: null,
 
+            // =================================================================
+            // SỬA LỖI: Bắt đầu phần sửa lỗi hiển thị modal
+            // =================================================================
             init() {
                 const modalEl = document.getElementById('customModal');
                 if (!modalEl) return;
@@ -946,14 +993,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 this.cancelBtn = document.getElementById('modalCancelBtn');
 
                 this.confirmBtn.addEventListener('click', () => {
-                    if (typeof this.onConfirmCallback === 'function') {
-                        this.onConfirmCallback();
-                    }
+                    // First, hide the current modal.
                     this.instance.hide();
+                    
+                    // Then, if a callback exists, attach it to the 'hidden' event
+                    // to ensure it runs *after* the modal is fully closed, preventing race conditions.
+                    if (typeof this.onConfirmCallback === 'function') {
+                        // A stable reference is needed because `this.onConfirmCallback`
+                        // might be changed by another call to `show()` before this event fires.
+                        const callbackToRun = this.onConfirmCallback;
+                        modalEl.addEventListener('hidden.bs.modal', callbackToRun, { once: true });
+                    }
                 });
             },
 
-            show({ title, message, type = 'primary', confirmText = 'OK', showCancel = false, onConfirm = null }) {
+            show({ title, message, type = 'primary', confirmText = 'OK', showCancel = false, onConfirm = null, isNotification = false }) {
                 this.titleEl.textContent = title;
                 this.messageEl.innerHTML = message;
                 
@@ -962,17 +1016,37 @@ document.addEventListener('DOMContentLoaded', function () {
                 else if (type === 'success') this.iconEl.classList.add('ti-check');
                 else this.iconEl.classList.add('ti-info-circle');
 
-                this.confirmBtn.textContent = confirmText;
-                this.confirmBtn.className = `btn`;
-                if(!showCancel) this.confirmBtn.classList.add('w-100');
-                this.confirmBtn.classList.add(`btn-${type}`);
-                
-                this.cancelBtn.style.display = showCancel ? 'block' : 'none';
+                if (isNotification) {
+                    // Notification Mode: Only show one "Close" button.
+                    this.confirmBtn.style.display = 'none';
+                    
+                    this.cancelBtn.textContent = 'Đóng';
+                    this.cancelBtn.className = 'btn btn-primary w-100'; // Use primary color for visibility
+                    this.cancelBtn.style.display = 'block';
+                } else {
+                    // Confirmation/Action Mode (original behavior)
+                    this.confirmBtn.style.display = 'block';
+                    this.confirmBtn.textContent = confirmText;
+                    this.confirmBtn.className = `btn btn-${type}`;
+                    
+                    this.cancelBtn.textContent = 'Hủy'; // Reset text
+                    this.cancelBtn.className = 'btn btn-secondary'; // Reset class
+                    this.cancelBtn.style.display = showCancel ? 'block' : 'none';
+
+                    if (showCancel) {
+                        this.confirmBtn.classList.remove('w-100');
+                    } else {
+                        this.confirmBtn.classList.add('w-100');
+                    }
+                }
 
                 this.onConfirmCallback = onConfirm;
                 
                 this.instance.show();
             }
+            // =================================================================
+            // SỬA LỖI: Kết thúc phần sửa lỗi hiển thị modal
+            // =================================================================
         },
         
         protection: {

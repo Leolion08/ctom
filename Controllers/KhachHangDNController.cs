@@ -54,11 +54,20 @@ namespace CTOM.Controllers
             return View(new KhachHangDNViewModel());
         }
 
+        [HttpGet]
+        [Route("CreatePartial")]
+        public IActionResult CreatePartial()
+        {
+            // Trả về partial view chứa form tạo KHDN để nhúng vào modal qua AJAX
+            return PartialView("_CreatePartial", new KhachHangDNViewModel());
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Route("Create")]
         public async Task<IActionResult> Create(KhachHangDNViewModel model)
         {
+            bool isAjax = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
             if (ModelState.IsValid)
             {
                 try
@@ -70,6 +79,10 @@ namespace CTOM.Controllers
                     {
                         ModelState.AddModelError(nameof(model.SoCif),
                             $"Số CIF '{model.SoCif}' đã tồn tại trong hệ thống.");
+                        if (isAjax)
+                        {
+                            return BadRequest(ApiResponse.Fail($"Số CIF '{model.SoCif}' đã tồn tại trong hệ thống."));
+                        }
                         return View(model);
                     }
 
@@ -77,6 +90,10 @@ namespace CTOM.Controllers
                     if (currentUser == null)
                     {
                         ModelState.AddModelError(string.Empty, "Không thể xác định người dùng hiện tại.");
+                        if (isAjax)
+                        {
+                            return BadRequest(ApiResponse.Fail("Không thể xác định người dùng hiện tại."));
+                        }
                         return View(model);
                     }
 
@@ -131,6 +148,35 @@ namespace CTOM.Controllers
                     _context.Add(khachHang);
                     await _context.SaveChangesAsync();
 
+                    if (isAjax)
+                    {
+                        return Json(ApiResponse.Ok(
+                            $"Thêm mới khách hàng thành công. Số CIF: {model.SoCif}",
+                            new { soCif = model.SoCif, tenCif = model.TenCif }
+                        ));
+                    }
+
+                    //// iframe
+                    // Nếu tạo trong iframe (embed=1) thì trả về trang tối giản để thông báo cho parent qua postMessage
+                    if (Request.Query.TryGetValue("embed", out var embed) && string.Equals(embed, "1", StringComparison.Ordinal))
+                    {
+                        var cif = (model.SoCif ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+                        var ten = (model.TenCif ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+                        var html = "<!DOCTYPE html>" +
+                                   "<html lang=\"vi\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>" +
+                                   "<body style=\"font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding:16px;\">" +
+                                   "  <p>Tạo khách hàng thành công. CIF: <b>" + cif + "</b></p>" +
+                                   "  <script>" +
+                                   "    try {" +
+                                   "      window.parent && window.parent.postMessage({ type: 'cifCreated', cif: \"" + cif + "\", tenCif: \"" + ten + "\" }, '*');" +
+                                   "    } catch (e) { console.error(e); }" +
+                                   "  </script>" +
+                                   "</body></html>";
+                        return Content(html, "text/html; charset=utf-8");
+                    }
+
+                    ////end iframe
+
                     TempData["SuccessMessage"] = $"Thêm mới khách hàng thành công. Số CIF: {model.SoCif}";
                     return RedirectToAction(nameof(Index));
                 }
@@ -139,6 +185,17 @@ namespace CTOM.Controllers
                     _logger.LogError(ex, "Lỗi khi thêm mới khách hàng");
                     ModelState.AddModelError("", "Đã xảy ra lỗi khi lưu dữ liệu. Vui lòng thử lại sau.");
                 }
+            }
+            if (string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+            {
+                // Gom lỗi ModelState (nếu có) theo dạng IDictionary<string, string[]>
+                var errors = ModelState
+                    .Where(kvp => kvp.Value != null && kvp.Value.Errors.Count > 0)
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
+                    );
+                return BadRequest(ApiResponse.Fail("Dữ liệu không hợp lệ", errors));
             }
             return View(model);
         }

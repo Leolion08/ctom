@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSave = document.getElementById('btnSave');
     const btnBack = document.getElementById('btnBack');
 
+
     /**
      * Thiết lập và hiển thị giao diện cho bước 2.
      * @param {Array} fields - Mảng định nghĩa các trường động.
@@ -227,8 +228,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. Nếu người dùng xác nhận, tiến hành submit form
         if (userConfirmed) {
+            // DEBUG: Thu thập và log dữ liệu FormValues gửi lên để chẩn đoán binding
+            try {
+                const fvInputs = Array.from(step2Form.querySelectorAll('input[name^="FormValues["], textarea[name^="FormValues["]'))
+                    .filter(el => !el.disabled);
+                const formValues = {};
+                fvInputs.forEach(el => {
+                    const m = el.name.match(/^FormValues\[(.+)\]$/);
+                    if (m) formValues[m[1]] = el.value;
+                });
+
+                const expectedFields = (utils.getCurrentFields?.() || []).map(f => f.fieldName);
+                const missingInputs = expectedFields.filter(fn => !fvInputs.some(el => el.name === `FormValues[${fn}]`));
+
+                // Log gọn gàng để dễ đọc trên console
+                console.debug('[Create Step2] FormValues object:', formValues);
+                if (missingInputs.length > 0) {
+                    console.warn('[Create Step2] Thiếu input cho các trường:', missingInputs);
+                }
+
+                // Tuỳ chọn: log toàn bộ FormData entries để so sánh
+                const fd = new FormData(step2Form);
+                const entries = {};
+                for (const [k, v] of fd.entries()) { entries[k] = v; }
+                console.debug('[Create Step2] Toàn bộ FormData entries:', entries);
+            } catch (dbgErr) {
+                console.warn('[Create Step2] Lỗi khi log debug FormValues:', dbgErr);
+            }
+
+            utils.setProcessingState(true, btnSave, { text: 'Đang lưu...' });
             step2Form.submit(); // Thực hiện submit form một cách tự nhiên
+            return;
         }
+        // Nếu người dùng hủy ở modal xác nhận, đảm bảo nút vẫn ở trạng thái bình thường
+        utils.setProcessingState(false, btnSave);
     });
 
     btnBack.addEventListener('click', () => {

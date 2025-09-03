@@ -13,6 +13,8 @@
     gap: 1rem;
     align-items: flex-start;
 }
+/* Các run trong .w-num-bullet phải inline để dính sát marker */
+#document-preview p.w-num.w-num-bullet .w-r { display: inline !important; white-space: normal !important; }
 
 /* Sidebar trái và phải - cố định width */
 .sidebar {
@@ -71,13 +73,32 @@
 }
 
 /* Hover effect cho document preview */
+/*
 #document-preview:hover {
     background: #f8f9fa;
 }
-
+*/
 /* Font family cho tất cả elements trong document preview */
 #document-preview * {
     font-family: 'Times New Roman', Times, serif !important;
+}
+
+/* Khối HTML sinh từ DOCX: mô phỏng trang A4 và typography Word */
+#document-preview .docx-html {
+    /*width: 794px;*/              /* 210mm @96dpi ~ 794px */
+    margin: 0 auto;            /* canh giữa trang */
+    background: #ffffff;
+    color: #000;
+    /*font-size: 12pt;*/           /* tương đương 12pt Word */
+    /*line-height: 1.15;*/         /* gần mặc định Word */
+    white-space: pre-wrap;     /* giữ khoảng trắng + xuống dòng + tab */
+    tab-size: 4;               /* hiển thị tab gần với Word (tổng quát) */
+    -moz-tab-size: 4;
+    /*padding: 96px;*/             /* ~ 1 inch mỗi cạnh để mô phỏng margin */
+    /*
+    padding:12px 24px 12px 24px; 
+    box-shadow: 0 0 0 1px #ebeef2, 0 4px 10px rgba(0,0,0,.08);
+    */
 }
 
 /* Hover effect cho elements có thể mapping */
@@ -92,25 +113,285 @@
 
 /* Paragraph styling trong document */
 #document-preview p {
-    margin: 0;
+    margin: 0 0 0.4em 0;       /* spacing nhẹ giữa các đoạn */
     padding: 0;
     min-height: 1em;
 }
 
+/* Ẩn các đoạn chỉ chứa checkbox đơn lẻ (backend gắn cờ) để tránh ô vuông lơ lửng */
+#document-preview p[data-checkbox-only="true"] { display: none !important; }
+
+/* Run trong paragraph thừa hưởng whitespace & tab-size */
+#document-preview .w-r {
+    white-space: inherit;
+}
+
+/* Ẩn control field của Word và các run rỗng để tránh tạo khoảng/line-break thừa */
+#document-preview .w-fldChar { display: none !important; }
+#document-preview .w-r:empty { display: none !important; }
+
+/* Tab từ DOCX (đang render ký tự \t) */
+#document-preview .w-tab {
+    white-space: pre;          /* đảm bảo tab hiển thị */
+}
+
 /* Table styling trong document */
-#document-preview table {
-    border-collapse: collapse;
+#document-preview table.w-tbl {
     width: 100%;
-    margin-top: 1em;
-    margin-bottom: 1em;
+    border-collapse: collapse;
+    border: 1px solid #dee2e6;
+    margin: 0.5em 0;
+    background: #fff;
+    table-layout: fixed; /* kết hợp với <colgroup> để ổn định cột */
 }
-
-/* Table cell styling */
-#document-preview td {
-    word-wrap: break-word;
+#document-preview table.w-tbl th,
+#document-preview table.w-tbl td {
+    border: 1px solid #e9ecef;
     vertical-align: top;
+    padding: 2px 4px;          /* cell padding nhẹ */
+    overflow-wrap: break-word; /* tránh tràn ô khi có chuỗi dài, không cắt bừa ký tự */
+    word-break: normal;
+    hyphens: auto;
 }
 
+/* Bảng cha vs bảng lồng nhau */
+#document-preview table.w-tbl.parent-table { font-size: 1em; }
+#document-preview table.w-tbl.nested-table { font-size: 0.95em; }
+
+/* Bảo vệ bố cục: ảnh không vượt quá ô/bảng */
+#document-preview table.w-tbl img,
+#document-preview .w-td img,
+#document-preview .w-tr img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Sửa wrapper 0xH: đảm bảo p/span bao ảnh có khung hiển thị đúng trong ô */
+#document-preview .w-td .w-p {
+    margin: 0 !important;         /* reset mọi margin của Word */
+    margin-right: 0 !important;   /* đặc biệt chặn margin-right lớn */
+    padding: 0 !important;
+    max-width: 100%;
+    width: 100% !important;       /* buộc p chiếm toàn bộ bề rộng ô */
+}
+#document-preview .w-td .w-r {
+    display: inline;        /* GIỮ inline để bảo toàn khoảng trắng cuối run */
+    width: auto !important; /* tránh inline style width:100% làm sai bối cảnh */
+    height: auto !important;
+    max-width: 100%;
+}
+#document-preview .w-td img.w-drawing {
+    display: block;         /* tránh bị co lại theo inline context, giúp tính toán kích thước ổn định */
+    max-width: 100%;
+    max-height: 100%;       /* cố gắng không vượt quá chiều cao ô nếu có chiều cao xác định */
+    object-fit: contain;    /* giữ tỷ lệ khi co giãn */
+}
+
+/* Nếu run chứa ảnh, cho phép inline-block để bọc đúng kích thước ảnh */
+#document-preview .w-td .w-r:has(img.w-drawing) {
+    display: inline-block;
+}
+
+/* Fallback khe rất nhỏ giữa hai run liền kề để giảm dính chữ trong trường hợp mất space do chia run */
+#document-preview .w-p .w-r + .w-r { margin-left: 0.05ch; }
+
+/* Soft-gap do backend chèn: phần tử rỗng chỉ hiển thị, không chứa ký tự */
+#document-preview .w-soft-gap {
+    display: inline-block;
+    width: 0.15ch;          /* khe nhỏ vừa đủ, không phá layout */
+    height: 1em;            /* theo dòng hiện tại */
+    vertical-align: baseline;
+}
+/* Khi đã có soft-gap, không cần fallback margin kề run */
+#document-preview .w-r + .w-soft-gap { margin-left: 0; }
+#document-preview .w-soft-gap + .w-r { margin-left: 0; }
+
+/* Cho phép colgroup kiểm soát độ rộng cột */
+#document-preview table.w-tbl colgroup col { width: auto; }
+
+/* Align styles */
+.w-align-center { text-align: center; }
+.w-align-right { text-align: right; }
+.w-align-justify { text-align: justify; }
+
+/* Cải thiện hiển thị cho đoạn căn đều: giãn theo khoảng trắng giữa từ, tránh bết chữ */
+#document-preview p.w-align-justify {
+  text-align: justify;         /* nhấn mạnh tại p */
+  text-justify: inter-word;    /* ưu tiên giãn theo khoảng trắng giữa từ */
+  word-spacing: 0.06em;        /* rất nhẹ, không phá layout */
+  hyphens: auto;               /* cho phép ngắt từ mềm khi cần */
+}
+
+/* ========================================
+   5a. NUMBERING/BULLETS (2 cấp) - Không thay đổi nội dung text
+   ======================================== */
+
+/* Căn trái dư chỗ cho marker, không ảnh hưởng text thực */
+#document-preview p.w-num {
+    position: relative;
+    padding-left: 2em;    /* tăng không gian để tránh chồng lên text */
+    text-indent: 0 !important; /* vô hiệu hanging indent từ Word để tránh chồng lấn */
+}
+#document-preview p.w-num.w-lvl-1 { padding-left: 3.6em; }
+
+/* Riêng bullet, đảm bảo luôn có đủ chỗ cho marker hình vuông */
+#document-preview p.w-num.w-num-bullet { padding-left: 2.1em !important; }
+
+/* Trong ô bảng: vô hiệu text-indent âm từ Word, đảm bảo không đẩy marker ra khỏi khung */
+#document-preview .w-td p.w-num,
+#document-preview td p.w-num {
+    margin: 0 !important;
+    text-indent: 0 !important;
+    padding-left: 1.6em; /* đủ chỗ cho marker */
+    max-width: 100%;
+    overflow: visible; /* để ::before không bị cắt nếu âm lề */
+}
+
+/* Pseudo marker */
+#document-preview p.w-num::before {
+    position: absolute;
+    left: 0.1em;            /* tạo khoảng trống nhỏ với mép trái */
+    width: 1.5em;           /* box rộng hơn để chữ luôn bắt đầu sau marker */
+    text-align: right;
+    white-space: pre;
+    font-family: 'Times New Roman', Times, serif; /* đảm bảo có glyph cho □ */
+    font-size: 1em;
+    line-height: 1; /* tránh bị cắt do line-height khác biệt */
+    pointer-events: none;   /* không gây cản trở chọn text */
+}
+
+/* Bullet: dùng trực tiếp lvlText nếu có (•, –, ◦...) */
+#document-preview p.w-num[data-num-fmt-lc="bullet"]::before {
+    content: attr(data-lvl-text) " \0020"; /* thêm 1 khoảng trắng hiển thị */
+}
+
+/* Trong ô bảng: cho nội dung co giãn, không tràn ra khỏi td cha */
+#document-preview .w-td .w-p,
+#document-preview td .w-p { max-width: 100%; }
+#document-preview .w-td .w-r,
+#document-preview td .w-r {
+    white-space: normal;  /* thu gọn chuỗi space dài của Word để tránh tràn */
+    overflow-wrap: anywhere; /* cho phép bẻ dòng khi cần */
+    word-break: break-word;
+    max-width: 100%;
+}
+
+/* === BULLET INLINE MODE ===
+   Hiển thị ô vuông/các ký hiệu bullet nằm cùng dòng với text (không absolute) */
+#document-preview p.w-num[data-num-fmt-lc="bullet"] {
+    padding-left: 0 !important;    /* không cần khoảng left riêng khi marker inline */
+    white-space: normal;           /* tránh giữ chuỗi space/tab dài gây xuống dòng sau marker */
+    margin-left: 0 !important;     /* chặn margin-left âm từ Word */
+    text-indent: 0 !important;     /* tuyệt đối vô hiệu indent */
+    display: inline-flex;          /* marker và nội dung nằm chung dòng */
+    align-items: baseline;
+    gap: 0.4em;                    /* thay cho margin-right ở ::before */
+    flex-wrap: wrap;               /* cho phép xuống dòng trong ô hẹp */
+}
+#document-preview td p.w-num[data-num-fmt-lc="bullet"],
+#document-preview .w-td p.w-num[data-num-fmt-lc="bullet"] {
+    /* Trong ô bảng: dùng lại chế độ marker tuyệt đối để tránh ô vuông rơi riêng dòng */
+    display: block !important;
+    position: relative !important;
+    padding-left: 1.6em !important; /* đủ chỗ cho marker */
+    margin-left: 0 !important;
+    text-indent: 0 !important;
+    white-space: normal !important;
+}
+/* Ngoài bảng: mỗi đoạn bullet vẫn phải là block để xuống dòng đúng */
+#document-preview p.w-num[data-num-fmt-lc="bullet"] {
+    display: block !important;
+}
+#document-preview p.w-num[data-num-fmt-lc="bullet"]::before {
+    position: static;               /* nằm trong dòng với text */
+    display: inline-block;
+    width: auto;
+    text-align: initial;
+    white-space: normal;
+    vertical-align: baseline;       /* canh cùng baseline với text */
+}
+
+/* Ghi đè: trong ô bảng, đặt marker tuyệt đối trong gutter trái */
+#document-preview td p.w-num[data-num-fmt-lc="bullet"]::before,
+#document-preview .w-td p.w-num[data-num-fmt-lc="bullet"]::before {
+    position: absolute !important;
+    left: 0.1em !important;
+    width: 1.2em !important;
+    text-align: right !important;
+    white-space: pre !important;
+    display: inline-block !important;
+}
+
+/* HỖ TRỢ THEO CLASS (phòng data-num-fmt-lc không chuẩn): áp dụng inline cho .w-num-bullet */
+#document-preview p.w-num.w-num-bullet {
+    padding-left: 0 !important;
+    white-space: normal;
+    margin-left: 0 !important;
+    text-indent: 0 !important;
+}
+#document-preview p.w-num.w-num-bullet::before {
+    position: static;
+    display: inline-block;
+    width: auto;
+    margin-right: 0.4em;
+    text-align: initial;
+    white-space: normal;
+    vertical-align: baseline;
+    content: attr(data-lvl-text) " \0020";
+}
+
+/* Thu gọn whitespace trong các run bên trong bullet để bám sát marker */
+#document-preview p.w-num[data-num-fmt-lc="bullet"] .w-r {
+    white-space: normal !important;
+    display: inline !important;    /* tránh inline-block gây xuống dòng sau marker */
+}
+
+/* Ẩn tab/space đầu dòng nếu có từ Word để tránh rớt dòng sau marker */
+#document-preview p.w-num[data-num-fmt-lc="bullet"] > .w-tab:first-child,
+#document-preview p.w-num[data-num-fmt-lc="bullet"] > .w-r:first-child:empty { display: none !important; }
+/* Ẩn ngắt dòng đầu tiên (nếu có) gây tách marker và nội dung */
+#document-preview p.w-num[data-num-fmt-lc="bullet"] > .w-br:first-child { display: none !important; }
+/* Nếu run đầu rỗng sau khi loại tab/br, tránh chiếm chỗ */
+#document-preview p.w-num[data-num-fmt-lc="bullet"] > .w-r:first-child { min-width: 0; }
+
+/* Fallback có mục tiêu: nếu data-lvl-text là '□' thì vẫn đảm bảo hiển thị ô vuông */
+#document-preview p.w-num[data-num-fmt-lc="bullet"][data-lvl-text="□"]::before {
+    content: '□' " \0020";
+}
+
+/* Fallback khi thiếu lvl-text (rỗng/không có attr) mà backend đã set numFmt=bullet */
+#document-preview p.w-num[data-num-fmt-lc="bullet"]:not([data-lvl-text])::before,
+#document-preview p.w-num[data-num-fmt-lc="bullet"][data-lvl-text=""]::before { content: '□' " \0020"; }
+
+/* Fallback tương tự theo class .w-num-bullet khi lvl-text = '□' hoặc rỗng */
+#document-preview p.w-num.w-num-bullet[data-lvl-text="□"]::before { content: '□' " \0020"; }
+#document-preview p.w-num.w-num-bullet:not([data-lvl-text]),
+#document-preview p.w-num.w-num-bullet[data-lvl-text=""]::before { content: '□' " \0020"; }
+
+/* BỎ Fallback ép ô vuông để giữ nguyên ký tự bullet gốc (-, +, *) theo data-lvl-text */
+
+/* Counters cho 2 cấp số: c0 (lvl0), c1 (lvl1) */
+#document-preview .docx-html { counter-reset: c0 c1; }
+
+/* Reset/increment theo data-start nếu có (bắt đầu lại danh sách) */
+#document-preview p.w-num.w-lvl-0[data-num-fmt-lc="decimal"][data-start] {
+    counter-reset: c0 calc(attr(data-start number) - 1), c1 0; /* reset cả level 1 khi gặp level 0 mới */
+}
+#document-preview p.w-num.w-lvl-1[data-num-fmt-lc="decimal"][data-start] {
+    counter-reset: c1 calc(attr(data-start number) - 1);
+}
+
+/* Tăng counter và hiển thị marker */
+#document-preview p.w-num.w-lvl-0[data-num-fmt-lc="decimal"] { counter-increment: c0; }
+#document-preview p.w-num.w-lvl-0[data-num-fmt-lc="decimal"]::before { content: counter(c0) ".\0020"; }
+
+#document-preview p.w-num.w-lvl-1[data-num-fmt-lc="decimal"] { counter-increment: c1; }
+#document-preview p.w-num.w-lvl-1[data-num-fmt-lc="decimal"]::before { content: counter(c0) "." counter(c1) ".\0020"; }
+
+/* Khoảng lề marker cho bullets cấp 1 */
+#document-preview p.w-num.w-lvl-1[data-num-fmt-lc="bullet"]::before {
+    left: 2em;
+}
 /* ========================================
    5. FIELD PLACEHOLDER SYSTEM - Hệ thống placeholder
    ======================================== */
@@ -119,21 +400,48 @@
 .field-placeholder {
     background-color: #cfe2ff;
     border: 1px dashed #0d6efd;
-    border-radius: 3px;
-    /* padding: 0.15em 0.4em;
-    margin: 0.05em; */
+    border-radius: 2px;
+    padding: 0;                /* không thêm khoảng trống để tránh thay đổi bố cục */
+    margin: 0;
     color: #074cb3;
     display: inline-block;
     white-space: nowrap;
     user-select: none;
     font-size: clamp(9px, inherit, 16px);
     max-width: 100%;
-    overflow: hidden;
+    /* overflow: hidden; */
     text-overflow: ellipsis;
-    vertical-align: middle;
-    line-height: 1.1;
+    vertical-align: baseline;
+    line-height: inherit;      /* giữ line-height của văn bản */
     cursor: help;
     position: relative;
+
+    /* font-size: inherit !important; */
+    /* font-weight: inherit !important; */
+    /* font-style: inherit !important; */
+    /* line-height: inherit !important; */
+}
+
+/* Highlight các placeholder thô <<...>> từ DOCX (render-only, không thay đổi text) */
+.placeholder-span {
+    /* background-color: rgba(13, 110, 253, 0.08);
+    outline: 1px dashed rgba(13, 110, 253, 0.6); */
+    background-color: #cfe2ff;
+    border: 1px dashed #0d6efd;
+    color: #074cb3;
+    outline-offset: 0;          /* không nở kích thước hộp */
+    border-radius: 2px;
+    padding: 0;                 /* không thêm padding để giữ offset */
+    margin: 0;                  /* không thêm margin để không phá bố cục */
+    /*color: inherit;*/             /* giữ màu chữ gốc */
+    /* font-size: inherit !important; */
+    /* font-weight: inherit !important; */
+    /* font-style: inherit !important; */
+    /* line-height: inherit !important; */
+}
+.placeholder-span.placeholder-empty {
+    background-color: rgba(220, 53, 69, 0.08);
+    outline-color: rgba(220, 53, 69, 0.6);
 }
 
 /* Placeholder trong bảng con lồng - responsive */
@@ -149,11 +457,11 @@
 td .field-placeholder,
 th .field-placeholder {
     font-size: clamp(8px, 0.8em, inherit);
-    padding: 0.1em 0.25em;
+    padding: 0;
     margin: 0;
     display: inline-block;
-    max-width: calc(100% - 0.5em);
-    line-height: 1.1;
+    max-width: 100%;
+    line-height: inherit;
     height: auto;
 }
 
@@ -195,9 +503,9 @@ td:has(.field-placeholder) {
 .mapped-field {
     background-color: #cfe2ff;
     border: 1px dashed #0d6efd;
-    border-radius: 3px;
-    padding: 0.15em 0.4em;
-    margin: 0.05em;
+    border-radius: 2px;
+    padding: 0;                /* không làm thay đổi chiều rộng nội dung */
+    margin: 0;
     color: #074cb3;
     display: inline-block;
     white-space: nowrap;
@@ -206,19 +514,19 @@ td:has(.field-placeholder) {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    vertical-align: middle;
-    line-height: 1.1;
+    vertical-align: baseline;
+    line-height: inherit;
 }
 
 /* Mapped field trong bảng - thích ứng với không gian */
 td .mapped-field,
 th .mapped-field {
     font-size: clamp(8px, 0.8em, inherit);
-    padding: 0.1em 0.25em;
+    padding: 0;
     margin: 0;
-    line-height: 1.1;
+    line-height: inherit;
     height: auto;
-    max-width: calc(100% - 0.5em);
+    max-width: 100%;
 }
 
 /* Mapped field trong paragraph của bảng */
@@ -257,6 +565,17 @@ th p .mapped-field {
     align-items: center;
     gap: 0.75rem;
     min-width: 0;
+}
+
+.w-checkbox {
+  display: inline-block;
+  line-height: 1;
+}
+.w-checkbox::before {
+  content: '□';
+  font-family: inherit;
+  font-size: 1em;
+  vertical-align: baseline;
 }
 
 /* Thông tin field item */

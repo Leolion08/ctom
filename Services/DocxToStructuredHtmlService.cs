@@ -3,6 +3,9 @@
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
+using DocumentFormat.OpenXml.Drawing; // a:*
+using WpDrawing = DocumentFormat.OpenXml.Drawing.Wordprocessing; // wp:*
+using W = DocumentFormat.OpenXml.Wordprocessing; // alias rõ ràng cho Wordprocessing
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -13,1525 +16,1180 @@ using System.Text;
 using System.Text.RegularExpressions; // Thêm thư viện Regex để sử dụng
 using System.Security.Cryptography; // [SỬA ĐỔI] Thêm using cho việc hash
 
-namespace CTOM.Services;
-
-public class DocxToStructuredHtmlService
+namespace CTOM.Services
 {
-    private int _paragraphIndex = 0;
-    private int _tableIndex = 0;
-    private int _checkboxIndex = 0;
-    private int _imageIndex = 0;
-    private int _nestedTableDepth = 0;
-    private int _globalElementId = 0;
-    private Dictionary<string, string> _elementIdMap = new();
-
-    // SỬA ĐỔI: Thêm tham số maxTableNestingLevel.
-    public string ConvertToHtml(byte[] docxBytes, int maxTableNestingLevel, bool isViewMode = false)
-    {
-        using var stream = new MemoryStream(docxBytes);
-        using var wordDoc = WordprocessingDocument.Open(stream, false);
-
-        var mainPart = wordDoc.MainDocumentPart;
-        if (mainPart?.Document?.Body == null) return string.Empty;
-
-        var body = mainPart.Document.Body;
-        var htmlBuilder = new StringBuilder();
-
-        // Reset counters for each conversion
-        _paragraphIndex = 0;
-        _tableIndex = 0;
-        _checkboxIndex = 0;
-        _imageIndex = 0;
-        _nestedTableDepth = 0;
-        _globalElementId = 0;
-        _elementIdMap.Clear();
-
-        htmlBuilder.Append("<div data-container=\"document\" data-id=\"doc-1\">");
-        //htmlBuilder.Append("<div data-container=\"document\" data-id=\"doc-1\" style=\"margin: 0.5rem;\">");
-
-        // SỬA ĐỔI: Truyền maxTableNestingLevel vào hàm xử lý.
-        ProcessBodyElements(body.Elements(), mainPart, htmlBuilder, "body", maxTableNestingLevel, isViewMode);
-
-        htmlBuilder.Append("</div>");
-        return htmlBuilder.ToString();
-    }
-    private string GenerateUniqueElementId(string elementType)
-    {
-        return $"{elementType}-{++_globalElementId}";
-    }
-
     /// <summary>
-    /// Identify and normalize common bullet/symbol characters for list items
-    /// Based on SpecialBullets.txt reference for Word bullets to HTML entities
+    /// [NÂNG CẤP LỚN] Service này được tái cấu trúc để hỗ trợ hệ thống mapping mới.
+    /// - Chức năng chính: Chuyển đổi file DOCX thành HTML có cấu trúc.
+    /// - Nâng cấp quan trọng:
+    ///   1. Tự động gán ID duy nhất và bền vững (w14:paraId) cho tất cả các đoạn văn.
+    ///   2. Nhúng các ID này và URI của document part vào HTML output dưới dạng thuộc tính data-*.
+    ///   Điều này cung cấp cho client một "dấu vân tay" chính xác cho mỗi đoạn văn,
+    ///   giải quyết triệt để vấn đề định vị không ổn định.
     /// </summary>
-    /// <param name="text">Text to check</param>
-    /// <param name="isViewMode">True if in view mode</param>
-    /// <returns>Tuple (isBullet, bulletSymbol)</returns>
-    private (bool isBullet, string bulletSymbol) IdentifyBulletSymbol(string text, bool isViewMode = false)
+    public class DocxToStructuredHtmlService
     {
-        if (string.IsNullOrWhiteSpace(text))
-            return (false, "");
+        private delegate void ElementHandler(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart);
 
-        var trimmedText = text.Trim();
+        private readonly Dictionary<Type, ElementHandler> _handlers = new();
+        private readonly List<int> _footnoteQueue = new();
+        private readonly List<int> _endnoteQueue = new();
 
-        // Special bullets mapping based on SpecialBullets.txt
-        // Format: Word Character -> HTML Safe Character (view mode uses simple dash for consistency)
-        var bulletSymbols = new Dictionary<string, string>
+        // Ngữ cảnh field (w:fldChar/w:instrText) để nhận diện FORMCHECKBOX
+        private enum FieldContextKind { Unknown, FormCheckbox, Other }
+        private sealed class FieldContext
         {
-            // Common Word bullets with HTML entities
-            { "•", isViewMode ? "-" : "&#8226;" },    // Bullet (dot) - U+2022
-            { "◦", isViewMode ? "-" : "&#9702;" },    // White Bullet - U+25E6
-            { "–", isViewMode ? "-" : "&#8211;" },    // En Dash - U+2013
-            { "—", isViewMode ? "-" : "&#8212;" },    // Em Dash - U+2014
-            { "▪", isViewMode ? "-" : "&#9642;" },    // Black Small Square - U+25AA
-            { "■", isViewMode ? "-" : "&#9632;" },    // Black Square - U+25A0
-            { "●", isViewMode ? "-" : "&#9679;" },    // Black Circle - U+25CF
-            { "○", isViewMode ? "-" : "&#9675;" },    // White Circle - U+25CB
-            { "♦", isViewMode ? "-" : "&#9830;" },    // Diamond - U+2666
-            { "✓", isViewMode ? "-" : "&#10003;" },   // Check Mark - U+2713
-            { "→", isViewMode ? "-" : "&#8594;" },    // Right Arrow - U+2192
-
-            // Simple text bullets (always keep as-is)
-            { "-", "-" },                           // Hyphen - U+002D
-            { "+", "+" },                           // Plus - U+002B
-            { "*", "*" },                           // Asterisk - U+002A
-
-            // Additional common bullets
-            { "□", isViewMode ? "-" : "□" },         // White Square
-            { "▫", isViewMode ? "-" : "▫" },         // White Small Square
-            { "◆", isViewMode ? "-" : "◆" },         // Black Diamond
-            { "◇", isViewMode ? "-" : "◇" },         // White Diamond
-            { "~", "~" },                           // Tilde
-            { ">", ">" },                           // Greater than
-            { "»", isViewMode ? "-" : "»" },         // Right-pointing double angle quotation mark
-            { "►", isViewMode ? "-" : "►" },         // Black right-pointing pointer
-            { "▶", isViewMode ? "-" : "▶" },         // Black right-pointing triangle
-        };
-
-        // Check for exact match
-        if (bulletSymbols.ContainsKey(trimmedText))
-        {
-            return (true, bulletSymbols[trimmedText]);
+            public FieldContextKind Kind = FieldContextKind.Unknown;
+            public StringBuilder Instr = new();
+            public bool Emitted = false;
         }
 
-        // Check if text starts with bullet symbol + space/tab
-        foreach (var kvp in bulletSymbols)
+        private static bool IsWingdings2ForLevel(W.Level lvl)
         {
-            if (trimmedText.StartsWith(kvp.Key + " ") || trimmedText.StartsWith(kvp.Key + "\t"))
-            {
-                return (true, kvp.Value);
-            }
+            // Theo OpenXML: w:lvl/w:rPr trong numbering là NumberingSymbolRunProperties
+            var rpr = lvl.NumberingSymbolRunProperties;
+            var rFonts = rpr?.RunFonts;
+            var fontName = rFonts?.Ascii?.Value
+                           ?? rFonts?.HighAnsi?.Value
+                           ?? rFonts?.ComplexScript?.Value;
+            return !string.IsNullOrEmpty(fontName) && fontName.Equals("Wingdings 2", StringComparison.OrdinalIgnoreCase);
         }
 
-        return (false, "");
-    }
-
-    /// <summary>
-    /// Get appropriate bullet character based on numbering ID and level
-    /// Reads from numbering.xml to get exact bullet character
-    /// </summary>
-    private string GetNumberingBullet(int numId, int ilvl, bool isViewMode, MainDocumentPart mainPart)
-    {
-        try
+        private static bool IsPrivateUseGlyph(string? s)
         {
-            var numberingPart = mainPart.NumberingDefinitionsPart;
-            if (numberingPart?.Numbering == null)
-            {
-                return isViewMode ? "-" : "&#8226;"; // Fallback if no numbering part
-            }
-
-            // Find the num element with matching numId
-            var numElement = numberingPart.Numbering.Elements<NumberingInstance>()
-                .FirstOrDefault(n => n.NumberID?.Value == numId);
-            if (numElement == null)
-            {
-                return isViewMode ? "-" : "&#8226;"; // Fallback if numId not found
-            }
-
-            // Get the abstractNumId
-            var abstractNumId = numElement.AbstractNumId?.Val?.Value;
-            if (abstractNumId == null)
-            {
-                return isViewMode ? "-" : "&#8226;"; // Fallback if no abstractNumId
-            }
-
-            // Find the abstractNum element
-            var abstractNum = numberingPart.Numbering.Elements<AbstractNum>()
-                .FirstOrDefault(a => a.AbstractNumberId?.Value == abstractNumId);
-            if (abstractNum == null)
-            {
-                return isViewMode ? "-" : "&#8226;"; // Fallback if abstractNum not found
-            }
-
-            // Find the level with matching ilvl
-            var level = abstractNum.Elements<Level>()
-                .FirstOrDefault(l => l.LevelIndex?.Value == ilvl);
-            if (level == null)
-            {
-                return isViewMode ? "-" : "&#8226;"; // Fallback if level not found
-            }
-
-            // Handle special fonts (Wingdings, Symbol, etc.) with character codes
-            var runProperties = level.Elements<RunProperties>().FirstOrDefault();
-            var fontName = runProperties?.RunFonts?.Ascii?.Value;
-
-            // Get the bullet character from lvlText
-            var lvlText = level.LevelText?.Val?.Value;
-
-            // First, try to decode special font characters if we have font info
-            if (!string.IsNullOrEmpty(fontName) && !string.IsNullOrEmpty(lvlText))
-            {
-                // Check if this is a special font that needs character decoding
-                if (fontName.Contains("Wingdings") || fontName.Contains("Symbol"))
-                {
-                    var decodedChar = DecodeSpecialFontCharacter(lvlText, fontName, isViewMode);
-                    if (!string.IsNullOrEmpty(decodedChar))
-                    {
-                        return decodedChar;
-                    }
-                    // If decoding failed, try to handle as Unicode character
-                    if (lvlText.Length == 1)
-                    {
-                        var unicodeValue = (int)lvlText[0];
-                        // Common Wingdings/Symbol bullet ranges
-                        if (unicodeValue >= 0xF020 && unicodeValue <= 0xF0FF)
-                        {
-                            return isViewMode ? "■" : "&#9632;"; // Black square for view mode
-                        }
-                    }
-                }
-            }
-
-            // Handle direct text bullets or Unicode characters
-            if (!string.IsNullOrEmpty(lvlText))
-            {
-                // Check if it's a single Unicode character that might be a bullet
-                if (lvlText.Length == 1)
-                {
-                    var unicodeValue = (int)lvlText[0];
-                    // Handle common bullet Unicode ranges
-                    if (unicodeValue >= 0x2022 && unicodeValue <= 0x25FF) // Bullet and geometric shapes
-                    {
-                        return isViewMode ? "■" : $"&#{unicodeValue};"; // Use HTML entity
-                    }
-                    // Handle private use area (often used by symbol fonts)
-                    if (unicodeValue >= 0xE000 && unicodeValue <= 0xF8FF)
-                    {
-                        return isViewMode ? "■" : "&#9632;"; // Default to black square
-                    }
-                }
-
-                // Try normal bullet conversion for text-based bullets
-                var convertedBullet = ConvertBulletToHtml(lvlText, isViewMode);
-                if (!string.IsNullOrEmpty(convertedBullet) && convertedBullet != lvlText)
-                {
-                    return convertedBullet;
-                }
-
-                // If all else fails but we have lvlText, use it as-is or convert to safe bullet
-                //return isViewMode ? "■" : (lvlText.Length == 1 ? $"&#{(int)lvlText[0]};" : "&#9632;");
-                return isViewMode ? "-" : "&#8226;";
-            }
-
-            // Fallback to default bullet if no specific character found
-            return isViewMode ? "-" : "&#8226;";
-        }
-        catch (Exception)
-        {
-            // Error reading numbering definition, use safe fallback
-            return isViewMode ? "-" : "&#8226;"; // Safe fallback
-        }
-    }
-
-    // SỬA ĐỔI: Thêm tham số maxTableNestingLevel và truyền xuống các hàm con.
-    private void ProcessBodyElements(IEnumerable<OpenXmlElement> elements, MainDocumentPart mainPart, StringBuilder htmlBuilder, string parentPath, int maxTableNestingLevel, bool isViewMode)
-    {
-        foreach (var element in elements)
-        {
-            switch (element)
-            {
-                case Paragraph p:
-                    ProcessParagraphWithPath(p, mainPart, htmlBuilder, $"{parentPath}.p[{_paragraphIndex}]", maxTableNestingLevel, isViewMode);
-                    _paragraphIndex++;
-                    break;
-
-                case Table t:
-                    ProcessTableWithPath(t, mainPart, htmlBuilder, $"{parentPath}.tbl[{_tableIndex}]", maxTableNestingLevel, isViewMode);
-                    _tableIndex++;
-                    break;
-            }
-        }
-    }
-
-    // SỬA ĐỔI: Sử dụng maxTableNestingLevel để xác định data-mappable, thêm data-paragraph-hash
-        private void ProcessParagraphWithPath(Paragraph p, MainDocumentPart mainPart, StringBuilder htmlBuilder, string docxPath, int maxTableNestingLevel, bool isViewMode)
-    {
-        var paragraphId = GenerateUniqueElementId("p");
-        _elementIdMap[docxPath] = paragraphId;
-
-        string paragraphStyle = ParseParagraphProperties(p.ParagraphProperties, mainPart);
-        // [SỬA ĐỔI] Tính hash nội dung của paragraph để làm định danh bền vững
-        var paragraphTextContent = p.InnerText;
-        var paragraphHash = ComputeSha256Hash(paragraphTextContent);
-
-        bool hasNumberingBullet = false;
-        string numberingBullet = "";
-
-        var pPr = p.ParagraphProperties;
-        if (pPr?.NumberingProperties != null)
-        {
-            var numPr = pPr.NumberingProperties;
-            var numId = numPr.NumberingId?.Val?.Value;
-            var ilvl = numPr.NumberingLevelReference?.Val?.Value ?? 0;
-            var pStyle = pPr.ParagraphStyleId?.Val?.Value;
-
-            if (pStyle == "ListParagraph" || numId.HasValue)
-            {
-                hasNumberingBullet = true;
-                numberingBullet = GetNumberingBullet(numId ?? 0, ilvl, isViewMode, mainPart);
-            }
+            if (string.IsNullOrEmpty(s)) return false;
+            // Lấy ký tự đầu tiên không phải placeholder số
+            var ch = s[0];
+            int cp = char.ConvertToUtf32(s, 0);
+            // Private Use Area (PUA): U+E000..U+F8FF
+            return cp >= 0xE000 && cp <= 0xF8FF;
         }
 
-        if (isViewMode)
+        private static bool ShouldKeepOriginalBullet(string? s)
         {
-            htmlBuilder.Append($"<p style='{paragraphStyle}'>");
-        }
-        else
-        {
-            var maxAllowedDepth = maxTableNestingLevel + 1;
-            string mappableAttr = (_nestedTableDepth <= maxAllowedDepth) ? "true" : "false";
+            // KHÔNG giữ nguyên nếu là ký tự vùng Private Use (PUA) – thường là Wingdings/Symbol
+            // Các glyph này không có đảm bảo font, cần chuẩn hóa sang Unicode an toàn (ví dụ '□').
+            if (IsPrivateUseGlyph(s)) return false;
 
-            // [SỬA ĐỔI] Thêm data-paragraph-hash vào thẻ p
-            htmlBuilder.Append($"<p data-mappable=\"{mappableAttr}\" data-element-id=\"{paragraphId}\" " +
-                              $"data-paragraph-hash=\"{paragraphHash}\" " + // Thêm thuộc tính hash
-                              $"data-type=\"paragraph\" data-docx-path=\"{docxPath}\" " +
-                              $"data-nested-depth=\"{_nestedTableDepth}\" style='{paragraphStyle}'>");
+            // Giữ nguyên nếu lvlText là một bullet phổ biến (ASCII/Unicode chuẩn: -, +, *, •, ·, –, —, ◦, ▪, ■, ●, ...)
+            return IsBulletLike(s);
         }
+        private readonly Stack<FieldContext> _fieldStack = new();
 
-        if (hasNumberingBullet)
+        public DocxToStructuredHtmlService()
         {
-            if (isViewMode)
-            {
-                htmlBuilder.Append($"<span style=\"display: inline-block; margin-right: 3px; font-size: 12px; color: #333;\">{numberingBullet}</span>");
-            }
-            else
-            {
-                htmlBuilder.Append($"<span data-mappable=\"false\" data-bulletid=\"{_paragraphIndex}-numbering-bullet\" " +
-                                  $"data-type=\"numbering-bullet\" data-docx-path=\"{docxPath}.numbering-bullet\" " +
-                                  $"style=\"display: inline-block; margin-right: 3px; font-size: 12px; color: #333;\">{numberingBullet}</span>");
-            }
+            InitHandlers();
         }
 
-        ProcessRunElements(p.Elements(), mainPart, htmlBuilder, docxPath, paragraphId, isViewMode);
-
-        htmlBuilder.Append("</p>");
-    }
-
-    private Dictionary<int, string> PreprocessTextSequences(List<OpenXmlElement> elements)
-    {
-        var textMap = new Dictionary<int, string>();
-
-        int runIndex = 0;
-        foreach (var element in elements)
+        private static string? NormalizeNumFmt(string? numFmt, string? lvlText)
         {
-            if (element is Run run)
+            // Loại các giá trị không hợp lệ từ SDK: "NumberFormatValues { }" hoặc chuỗi chứa '{'
+            if (!string.IsNullOrWhiteSpace(numFmt))
             {
-                var originalText = string.Join("", run.Elements<Text>().Select(t => t.Text ?? ""));
-                var processedText = originalText;
-
-                // Thay thế các chuỗi từ 3 ký tự trở lên thuộc họ "dấu chấm" bằng 4 dấu cách
-                processedText = Regex.Replace(
-                    processedText,
-                    @"([\.…⋯︙⋮·•‧∙．｡。])\1{2,}",  // lặp >= 3 lần các ký tự chấm
-                    "    "
-                );
-
-                if (processedText != originalText)
+                var trimmed = numFmt.Trim();
+                if (trimmed.Contains('{', StringComparison.Ordinal))
                 {
-                    textMap[runIndex] = processedText;
+                    numFmt = null;
                 }
             }
-            runIndex++;
+
+            // Suy luận bullet từ lvlText nếu numFmt trống
+            if (string.IsNullOrWhiteSpace(numFmt) && IsBulletLike(lvlText))
+            {
+                return "bullet";
+            }
+
+            if (string.IsNullOrWhiteSpace(numFmt)) return null;
+
+            // Chuẩn hóa lowercase & một số alias
+            var nf = numFmt.Trim().ToLowerInvariant();
+            return nf switch
+            {
+                "bullet" => "bullet",
+                "decimal" => "decimal",
+                "lowerletter" => "lowerletter",
+                "lowerlatin" => "lowerletter",
+                "upperletter" => "upperletter",
+                "upperlatin" => "upperletter",
+                _ => nf
+            };
         }
 
-        return textMap;
-    }
-
-    private void ProcessRunElements(IEnumerable<OpenXmlElement> elements, MainDocumentPart mainPart, StringBuilder htmlBuilder, string parentPath, string parentElementId = "", bool isViewMode = false)
-    {
-        // BƯỚC TIỀN XỬ LÝ: Thu thập tất cả text từ các run để xử lý chuỗi dấu chấm/gạch dưới liên tiếp
-        var elementsList = elements.ToList();
-        var preprocessedTexts = PreprocessTextSequences(elementsList);
-
-        int runIndex = 0;
-
-        foreach (var element in elementsList)
+        private void InitHandlers()
         {
-            if (element is Run run)
-            {
-                string runStyle = ParseRunProperties(run.RunProperties, mainPart);
+            _handlers[typeof(W.Paragraph)] = HandleParagraph;
+            _handlers[typeof(W.Run)] = HandleRun;
+            _handlers[typeof(W.Text)] = HandleText;
+            _handlers[typeof(W.SymbolChar)] = HandleSymbol;      // w:sym
+            _handlers[typeof(W.Table)] = HandleTable;
+            _handlers[typeof(W.TableRow)] = HandleTableRow;
+            _handlers[typeof(W.TableCell)] = HandleTableCell;
+            _handlers[typeof(W.Break)] = HandleBreak;
+            _handlers[typeof(W.TabChar)] = HandleTab;
+            _handlers[typeof(W.Hyperlink)] = HandleHyperlink;
+            _handlers[typeof(W.BookmarkStart)] = HandleBookmarkStart;
+            _handlers[typeof(W.BookmarkEnd)] = HandleBookmarkEnd;
+            _handlers[typeof(W.SimpleField)] = HandleFieldSimple;
+            _handlers[typeof(W.FieldChar)] = HandleFieldChar;
+            // Đăng ký handler cho w:instrText (InstrText/InstructionText tùy phiên bản SDK)
+            var instrTextType = Type.GetType("DocumentFormat.OpenXml.Wordprocessing.InstrText, DocumentFormat.OpenXml")
+                                 ?? Type.GetType("DocumentFormat.OpenXml.Wordprocessing.InstructionText, DocumentFormat.OpenXml");
+            if (instrTextType != null)
+                _handlers[instrTextType] = HandleInstrText;
+            _handlers[typeof(W.FootnoteReference)] = HandleFootnoteRef;
+            _handlers[typeof(W.EndnoteReference)] = HandleEndnoteRef;
+            _handlers[typeof(W.CommentReference)] = HandleCommentRef;
+            _handlers[typeof(W.CommentRangeStart)] = HandleCommentRangeStart;
+            _handlers[typeof(W.CommentRangeEnd)] = HandleCommentRangeEnd;
+            _handlers[typeof(W.SdtRun)] = HandleSdtRun;
+            _handlers[typeof(W.SdtBlock)] = HandleSdtBlock;
+            _handlers[typeof(W.SdtCell)] = HandleSdtCell;
+            _handlers[typeof(Drawing)] = HandleDrawing;
 
-                // Enhanced checkbox and bullet detection logic
-                bool isCheckbox = false;
-                bool isBullet = false;
-                bool isChecked = false;
-                string bulletIcon = "";
-
-                // Method 1: Check for symbols (SymbolChar)
-                var symbolChar = run.Elements<SymbolChar>().FirstOrDefault();
-                if (symbolChar != null)
-                {
-                    var charValue = symbolChar.Char?.Value;
-                    var fontName = symbolChar.Font?.Value?.ToLower();
-
-                    // Checkbox symbols in Wingdings font
-                    if (charValue == "F0FE" || charValue == "F0FC" || // Checked boxes
-                        charValue == "F0A8" || charValue == "F0A7" || // Unchecked boxes
-                        charValue == "F06F" || charValue == "F070")   // Alternative checkbox chars
-                    {
-                        isCheckbox = true;
-                        isChecked = charValue == "F0FE" || charValue == "F0FC" || charValue == "F06F";
-                    }
-                    // Bullet symbols - enhanced detection for Wingdings 2 and other fonts
-                    else if (charValue == "F0B7" || charValue == "F0B8" || // Square bullets
-                             charValue == "F06C" || charValue == "F06D" || // Circle bullets
-                             charValue == "F0D8" || charValue == "F0FC" || // Diamond bullets
-                             charValue == "F0A7" || charValue == "F0A8" || // Other bullet styles
-                             charValue == "F0B2" || charValue == "F0B3" || // Additional square bullets
-                             charValue == "F0A1" || charValue == "F0A2" || // Small bullets
-                             charValue == "F0B9" || charValue == "F0BA" || // More bullet variants
-                             // Wingdings 2 specific characters for square bullets
-                             (fontName != null && fontName.Contains("wingdings") &&
-                              (charValue == "F020" || charValue == "F021" || charValue == "F022" ||
-                               charValue == "F023" || charValue == "F024" || charValue == "F025")))
-                    {
-                        isBullet = true;
-                        // Map to appropriate bullet icons - phân biệt view mode và mapping mode
-                        if (isViewMode)
-                        {
-                            // VIEW MODE: Convert tất cả symbol thành bullet thông thường
-                            bulletIcon = charValue switch
-                            {
-                                "F0B7" or "F0B8" or "F0B2" or "F0B3" => "-", // Square bullet -> dash
-                                "F06C" or "F06D" => "•", // Circle bullet
-                                "F0D8" => "♦",           // Diamond bullet
-                                "F0A1" or "F0A2" or "F0B9" or "F0BA" => "-", // White small square -> dash
-                                "F020" or "F021" or "F022" or "F023" or "F024" or "F025" => "-", // Wingdings 2 -> dash
-                                _ => "-"                  // Default to dash
-                            };
-                        }
-                        else
-                        {
-                            // MAPPING MODE: Giữ nguyên logic cũ
-                            bulletIcon = charValue switch
-                            {
-                                "F0B7" or "F0B8" or "F0B2" or "F0B3" => "☐", // Square bullet like checkbox
-                                "F06C" or "F06D" => "•", // Circle bullet
-                                "F0D8" => "♦",           // Diamond bullet
-                                "F0A1" or "F0A2" or "F0B9" or "F0BA" => "▫", // White small square
-                                "F020" or "F021" or "F022" or "F023" or "F024" or "F025" => "☐", // Wingdings 2
-                                _ => "☐"                  // Default square like checkbox
-                            };
-                        }
-                    }
-                }
-
-                // Method 2: Check for text content
-                // We check for text-based bullets before checking for checkboxes to avoid misidentification.
-                if (!isCheckbox && !isBullet)
-                {
-                    var textElements = run.Elements<Text>();
-                    foreach (var text in textElements)
-                    {
-                        var textContent = text.Text?.Trim();
-                        if (!string.IsNullOrEmpty(textContent))
-                        {
-                            // Use general function to identify bullet symbols
-                            var (isBulletSymbol, bulletSymbol) = IdentifyBulletSymbol(textContent, isViewMode);
-                            if (isBulletSymbol)
-                            {
-                                isBullet = true;
-                                bulletIcon = bulletSymbol;
-                                break;
-                            }
-
-                            // Special case: Check if this run is the first run in paragraph and contains only "-"
-                            // This handles cases where bullet "-" is in a separate run from the text
-                            if (textContent == "-" && runIndex == 0)
-                            {
-                                // Check if paragraph has indent or is likely a list item
-                                var paragraph = run.Ancestors<Paragraph>().FirstOrDefault();
-                                if (paragraph != null)
-                                {
-                                    // Check for paragraph properties indicating list or indent
-                                    var pPr = paragraph.ParagraphProperties;
-                                    var hasIndent = (pPr?.Indentation?.Left?.HasValue == true && int.TryParse(pPr.Indentation.Left.Value, out var leftIndent) && leftIndent > 0) ||
-                                                   (pPr?.Indentation?.Hanging?.HasValue == true && int.TryParse(pPr.Indentation.Hanging.Value, out var hangingIndent) && hangingIndent > 0) ||
-                                                   (pPr?.Indentation?.FirstLine?.HasValue == true && int.TryParse(pPr.Indentation.FirstLine.Value, out var firstLineIndent) && firstLineIndent > 0);
-
-                                    // Check for numbering properties (list)
-                                    var hasNumbering = pPr?.NumberingProperties != null;
-
-                                    // If has indent or numbering, treat "-" as bullet
-                                    if (hasIndent || hasNumbering)
-                                    {
-                                        isBullet = true;
-                                        bulletIcon = "-";
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // CHỈ NHẬN DIỆN CHECKBOX THẬT từ Word - không phải text thường
-                            // Chỉ kiểm tra exact match với các ký hiệu checkbox chuẩn
-                            if (textContent == "☐" || textContent == "☑" || textContent == "☒")
-                            {
-                                isCheckbox = true;
-                                isChecked = textContent == "☑" || textContent == "☒";
-                                break; // Đã tìm thấy checkbox, không cần kiểm tra thêm trong run này.
-                            }
-                        }
-                    }
-                }
-
-                // Method 3: Check for legacy form field checkbox - ACCURATE DETECTION
-                if (!isCheckbox)
-                {
-                    var fieldChar = run.Elements<FieldChar>().FirstOrDefault();
-                    if (fieldChar != null && fieldChar.FieldCharType?.Value == FieldCharValues.Begin)
-                    {
-                        // Check if this is a real checkbox form field
-                        // Option 1: Check field code contains "FORMCHECKBOX"
-                        var nextRun = run.NextSibling<Run>();
-                        if (nextRun != null)
-                        {
-                            var fieldCode = nextRun.Elements<FieldCode>().FirstOrDefault();
-                            if (fieldCode != null && fieldCode.Text != null &&
-                                fieldCode.Text.Contains("FORMCHECKBOX", StringComparison.OrdinalIgnoreCase))
-                            {
-                                isCheckbox = true;
-                                // Check checked state from field code
-                                isChecked = fieldCode.Text.Contains("\\default 1") || fieldCode.Text.Contains("\\checked");
-                            }
-                        }
-
-                        // Option 2: If no field code found, check context
-                        if (!isCheckbox)
-                        {
-                            // Check if run contains checkbox symbols
-                            var runText = run.InnerText?.Trim();
-                            var parentText = run.Parent?.InnerText?.Trim();
-
-                            // If run or parent contains checkbox symbols, it might be a checkbox
-                            if (!string.IsNullOrEmpty(runText) && (runText.Contains("☐") || runText.Contains("☑") || runText.Contains("☒")) ||
-                                !string.IsNullOrEmpty(parentText) && (parentText.Contains("☐") || parentText.Contains("☑") || parentText.Contains("☒")))
-                            {
-                                isCheckbox = true;
-                                isChecked = runText?.Contains("☑") == true || runText?.Contains("☒") == true ||
-                                           parentText?.Contains("☑") == true || parentText?.Contains("☒") == true;
-                            }
-                        }
-                    }
-                }
-
-                if (isCheckbox)
-                {
-                    // REAL CHECKBOX from Word: Display in both view mode and mapping mode
-                    if (isViewMode)
-                    {
-                        // VIEW MODE: Display real checkbox from Word, no data attributes
-                        htmlBuilder.Append($"<span style=\"display: inline-block; margin-right: 3px; font-size: 14px; color: #333;\">");
-                        htmlBuilder.Append(isChecked ? "☑" : "☐");
-                        htmlBuilder.Append("</span>");
-                    }
-                    else
-                    {
-                        // MAPPING MODE: Display checkbox with full data attributes
-                        htmlBuilder.Append($"<span data-mappable=\"false\" data-chkid=\"{_paragraphIndex}-chk-{_checkboxIndex}\" " +
-                                          $"data-type=\"checkbox\" data-docx-path=\"{parentPath}.r[{runIndex}].checkbox\" " +
-                                          $"style=\"display: inline-block; margin-right: 3px; font-size: 14px; color: #333;\">");
-                        htmlBuilder.Append(isChecked ? "☑" : "☐");
-                        htmlBuilder.Append("</span>");
-                    }
-
-                    _checkboxIndex++;
-                    runIndex++;
-                    continue;
-                }
-
-                if (isBullet)
-                {
-                    // Render bullet icon
-                    htmlBuilder.Append($"<span data-mappable=\"false\" data-bulletid=\"{_paragraphIndex}-bullet-{_checkboxIndex}\" " +
-                                      $"data-type=\"bullet\" data-docx-path=\"{parentPath}.r[{runIndex}].bullet\" " +
-                                      $"style=\"display: inline-block; margin-right: 3px; font-size: 12px; color: #333;\">");
-                    htmlBuilder.Append(bulletIcon);
-                    htmlBuilder.Append("</span>");
-                    _checkboxIndex++;
-
-                    // Xử lý text còn lại sau bullet
-                    string remainingText = "";
-                    foreach (var text in run.Elements<Text>())
-                    {
-                        var textContent = text.Text ?? "";
-                        // Loại bỏ bullet character khỏi đầu text
-                        if (textContent.StartsWith("-"))
-                        {
-                            remainingText = textContent.Substring(1).TrimStart();
-                        }
-                        else if (textContent.StartsWith("+"))
-                        {
-                            remainingText = textContent.Substring(1).TrimStart();
-                        }
-                        else if (textContent.StartsWith("*"))
-                        {
-                            remainingText = textContent.Substring(1).TrimStart();
-                        }
-                        else if (textContent != bulletIcon)
-                        {
-                            remainingText = textContent;
-                        }
-                        break;
-                    }
-
-                    // Render remaining text nếu có
-                    if (!string.IsNullOrWhiteSpace(remainingText))
-                    {
-                        if (preprocessedTexts.ContainsKey(runIndex))
-                        {
-                            var processedText = preprocessedTexts[runIndex];
-                            // Remove bullet from processed text
-                            if (processedText.StartsWith(bulletIcon))
-                            {
-                                processedText = processedText.Substring(bulletIcon.Length).TrimStart();
-                            }
-                            else if (processedText.StartsWith("-") || processedText.StartsWith("+") || processedText.StartsWith("*"))
-                            {
-                                processedText = processedText.Substring(1).TrimStart();
-                            }
-
-                            if (!string.IsNullOrWhiteSpace(processedText))
-                            {
-                                htmlBuilder.Append($"<span data-mappable=\"true\" data-rid=\"{_paragraphIndex}-{runIndex}\" " +
-                                                  $"data-type=\"run\" data-docx-path=\"{parentPath}.r[{runIndex}]\" style='{runStyle}'>");
-                                var highlightedContent = HighlightPlaceholders(processedText);
-                                htmlBuilder.Append(highlightedContent);
-                                htmlBuilder.Append("</span>");
-                            }
-                        }
-                        else
-                        {
-                            htmlBuilder.Append($"<span data-mappable=\"true\" data-rid=\"{_paragraphIndex}-{runIndex}\" " +
-                                              $"data-type=\"run\" data-docx-path=\"{parentPath}.r[{runIndex}]\" style='{runStyle}'>");
-                            var highlightedContent = HighlightPlaceholders(remainingText);
-                            htmlBuilder.Append(highlightedContent);
-                            htmlBuilder.Append("</span>");
-                        }
-                    }
-
-                    runIndex++;
-                    continue;
-                }
-
-                // Check for image in this run
-                var drawing = run.Elements<Drawing>().FirstOrDefault();
-                if (drawing != null)
-                {
-                    var imagePart = GetImagePartFromDrawing(drawing, mainPart);
-                    if (imagePart != null)
-                    {
-                        // Set responsive image style to prevent table overflow
-                        string imageStyle = "max-width: 150px; max-height: 150px; object-fit: contain; margin: 2px;";
-
-                        // Try to get original dimensions (simplified approach)
-                        var extentElements = drawing.Descendants().Where(d => d.LocalName == "extent");
-                        if (extentElements.Any())
-                        {
-                            // Use smaller fixed size for images in tables to prevent overflow
-                            imageStyle = "width: 100px; height: auto; max-height: 100px; object-fit: contain; margin: 2px;";
-                        }
-
-                        using var stream = imagePart.GetStream();
-                        using var ms = new MemoryStream();
-                        stream.CopyTo(ms);
-                        var base64Image = Convert.ToBase64String(ms.ToArray());
-                        var contentType = imagePart.ContentType;
-                        htmlBuilder.Append($"<img data-mappable=\"false\" data-imgid=\"{_paragraphIndex}-img-{_imageIndex}\" " +
-                                          $"data-type=\"image\" data-docx-path=\"{parentPath}.r[{runIndex}].drawing\" " +
-                                          $"src=\"data:{contentType};base64,{base64Image}\" " +
-                                          $"style=\"{imageStyle}\" />");
-                        _imageIndex++;
-                        runIndex++;
-                        continue;
-                    }
-                }
-
-                // Check for text content
-                if (run.Elements<Text>().Any())
-                {
-                    if (isViewMode)
-                    {
-                        // View mode: span đơn giản, không cần data attributes
-                        htmlBuilder.Append($"<span style='{runStyle}'>");
-                    }
-                    else
-                    {
-                        // Mapping mode: đầy đủ data attributes
-                        htmlBuilder.Append($"<span data-mappable=\"true\" data-rid=\"{_paragraphIndex}-{runIndex}\" " +
-                                          $"data-type=\"run\" data-docx-path=\"{parentPath}.r[{runIndex}]\" style='{runStyle}'>");
-                    }
-
-                    // Sử dụng text đã được tiền xử lý nếu có, nếu không thì xử lý như cũ
-                    if (preprocessedTexts.ContainsKey(runIndex))
-                    {
-                        // Text đã được xử lý chuỗi dấu chấm/gạch dưới ở bước tiền xử lý
-                        var processedText = preprocessedTexts[runIndex];
-
-                        // Vẫn cần xử lý spaces
-                        foreach (var text in run.Elements<Text>())
-                        {
-                            string finalContent = processedText;
-
-                            // Xử lý spaces dựa trên Space attribute
-                            if (text.Space?.Value == SpaceProcessingModeValues.Preserve)
-                            {
-                                if (finalContent.StartsWith(" ") || finalContent.EndsWith(" ") || finalContent.Contains("  "))
-                                {
-                                    finalContent = Regex.Replace(finalContent, @"^ +", m => new string('\u00A0', m.Length));
-                                    finalContent = Regex.Replace(finalContent, @" +$", m => new string('\u00A0', m.Length));
-                                    finalContent = Regex.Replace(finalContent, @"  +", m => new string('\u00A0', m.Length));
-                                }
-                            }
-
-                            // Highlight placeholder và append text
-                            var highlightedContent = HighlightPlaceholders(finalContent, isViewMode);
-                            htmlBuilder.Append(highlightedContent);
-                            break; // Chỉ xử lý text đầu tiên vì đã được merge
-                        }
-                    }
-                    else
-                    {
-                        // Xử lý text như cũ nếu không có trong preprocessed
-                        foreach (var text in run.Elements<Text>())
-                        {
-                            var textContent = text.Text ?? string.Empty;
-
-                            // Xử lý spaces dựa trên Space attribute
-                            string finalContent;
-                            if (text.Space?.Value == SpaceProcessingModeValues.Preserve)
-                            {
-                                var spaceProcessedContent = textContent;
-                                if (spaceProcessedContent.StartsWith(" ") || spaceProcessedContent.EndsWith(" ") || spaceProcessedContent.Contains("  "))
-                                {
-                                    spaceProcessedContent = Regex.Replace(spaceProcessedContent, @"^ +", m => new string('\u00A0', m.Length));
-                                    spaceProcessedContent = Regex.Replace(spaceProcessedContent, @" +$", m => new string('\u00A0', m.Length));
-                                    spaceProcessedContent = Regex.Replace(spaceProcessedContent, @"  +", m => new string('\u00A0', m.Length));
-                                }
-                                finalContent = spaceProcessedContent;
-                            }
-                            else
-                            {
-                                finalContent = textContent;
-                            }
-
-                            // Highlight placeholder và append text
-                            var highlightedContent = HighlightPlaceholders(finalContent, isViewMode);
-                            htmlBuilder.Append(highlightedContent);
-                        }
-                    }
-
-                    htmlBuilder.Append("</span>");
-                    runIndex++;
-                }
-                else if (run.Elements<TabChar>().Any())
-                {
-                    // Xử lý TabChar - sử dụng CSS tab-size để bảo toàn khoảng cách như Word
-                    // Word default tab stops are typically every 0.5 inches (36 points)
-                    int tabCount = run.Elements<TabChar>().Count();
-
-                    if (isViewMode)
-                    {
-                        // View mode: sử dụng CSS tab character để giống Word hơn
-                        for (int i = 0; i < tabCount; i++)
-                        {
-                            htmlBuilder.Append("<span style='display: inline-block; width: 2em; white-space: pre;'>\t</span>");
-                        }
-                    }
-                    else
-                    {
-                        // Mapping mode: giữ nguyên logic cũ để tránh ảnh hưởng mapping
-                        for (int i = 0; i < tabCount; i++)
-                        {
-                            htmlBuilder.Append("&nbsp;&nbsp;&nbsp;&nbsp;");
-                        }
-                    }
-                    runIndex++;
-                }
-            }
-            else if (element is SdtRun sdtRun)
-            {
-                // Process structured document tag (modern checkbox)
-                ProcessStructuredDocumentTag(sdtRun, mainPart, htmlBuilder, parentPath, runIndex, isViewMode);
-                runIndex++;
-            }
-            else if (element is FieldChar fieldChar)
-            {
-                // Process legacy checkbox (FieldChar type)
-                if (HasCheckboxFormField(fieldChar))
-                {
-                    if (!isViewMode)
-                    {
-                        // MAPPING MODE: Render legacy checkbox
-                        htmlBuilder.Append($"<span data-mappable=\"false\" data-chkid=\"{_paragraphIndex}-chk-{_checkboxIndex}\" " +
-                                          $"data-type=\"checkbox\" data-docx-path=\"{parentPath}.field[{runIndex}]\" " +
-                                          $"style=\"display: inline-block; margin-right: 3px; font-size: 14px; color: #333;\">");
-                        htmlBuilder.Append("☐"); // Default unchecked for legacy
-                        htmlBuilder.Append("</span>");
-                        _checkboxIndex++;
-                    }
-                    // VIEW MODE: HOÀN TOÀN BỎ QUA - không render checkbox
-                }
-                runIndex++;
-            }
-            else if (element is Drawing drawing)
-            {
-                // Process drawing/image at paragraph level
-                var imagePart = GetImagePartFromDrawing(drawing, mainPart);
-                if (imagePart != null)
-                {
-                    using var stream = imagePart.GetStream();
-                    using var ms = new MemoryStream();
-                    stream.CopyTo(ms);
-                    var base64Image = Convert.ToBase64String(ms.ToArray());
-                    var contentType = imagePart.ContentType;
-                    htmlBuilder.Append($"<img data-mappable=\"false\" data-imgid=\"{_paragraphIndex}-img-{_imageIndex}\" " +
-                                      $"data-type=\"image\" data-docx-path=\"{parentPath}.drawing[{runIndex}]\" " +
-                                      $"src=\"data:{contentType};base64,{base64Image}\" " +
-                                      $"style=\"max-width: 150px; max-height: 150px; object-fit: contain; margin: 2px;\" />");
-                    _imageIndex++;
-                }
-                runIndex++;
-            }
-        }
-    }
-
-    // SỬA ĐỔI: Sử dụng maxTableNestingLevel để xác định data-mappable và truyền cho các hàm đệ quy.
-   private void ProcessTableWithPath(Table table, MainDocumentPart mainPart, StringBuilder htmlBuilder, string docxPath, int maxTableNestingLevel, bool isViewMode)
-    {
-        _nestedTableDepth++;
-        bool isNestedTable = _nestedTableDepth > 1;
-
-        var tableId = GenerateUniqueElementId("tbl");
-        _elementIdMap[docxPath] = tableId;
-
-        string colGroupHtml = BuildColGroup(table);
-
-        string tableStyle = ParseTableProperties(table.GetFirstChild<TableProperties>());
-        string tableClass = isNestedTable ? "nested-table" : "parent-table";
-
-        var maxAllowedDepth = maxTableNestingLevel + 1;
-        string mappableAttr = (_nestedTableDepth <= maxAllowedDepth) ? "true" : "false";
-
-        htmlBuilder.Append($"<table class=\"{tableClass}\" data-element-id=\"{tableId}\" " +
-                          $"data-type=\"table\" data-docx-path=\"{docxPath}\" " +
-                          $"data-nested-depth=\"{_nestedTableDepth}\" data-mappable=\"{mappableAttr}\" " +
-                          $"style='border-collapse: collapse; {tableStyle}'>");
-
-        if (!string.IsNullOrEmpty(colGroupHtml))
-        {
-            htmlBuilder.Append(colGroupHtml);
+            // BỎ QUA (KHÔNG RENDER) CÁC PHẦN TỬ THUỘC NHÓM PROPERTIES HOẶC TRANG TRÍ
+            _handlers[typeof(W.ParagraphProperties)] = IgnoreElement; // w:pPr
+            _handlers[typeof(W.RunProperties)] = IgnoreElement;       // w:rPr
+            _handlers[typeof(W.TableProperties)] = IgnoreElement;     // w:tblPr
+            _handlers[typeof(W.TableRowProperties)] = IgnoreElement;  // w:trPr
+            _handlers[typeof(W.TableCellProperties)] = IgnoreElement; // w:tcPr
+            _handlers[typeof(W.SectionProperties)] = IgnoreElement;   // w:sectPr
+            _handlers[typeof(W.TableGrid)] = IgnoreElement;           // w:tblGrid
+            _handlers[typeof(W.ProofError)] = IgnoreElement;          // w:proofErr
+            _handlers[typeof(W.NoProof)] = IgnoreElement;             // w:noProof
         }
 
-        int rowIndex = 0;
-        foreach (var row in table.Elements<TableRow>())
+        private void ProcessElement(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
         {
-            htmlBuilder.Append("<tr>");
-            int cellIndex = 0;
-            foreach (var cell in row.Elements<TableCell>())
+            if (el == null) return;
+
+            if (_handlers.TryGetValue(el.GetType(), out var handler))
             {
-                string cellStyle = ParseTableCellProperties(cell.GetFirstChild<TableCellProperties>());
-                string cellPath = $"{docxPath}.tr[{rowIndex}].tc[{cellIndex}]";
-
-                var cellId = GenerateUniqueElementId("tc");
-                _elementIdMap[cellPath] = cellId;
-
-                var gridSpan = cell.GetFirstChild<TableCellProperties>()?.GridSpan?.Val?.Value ?? 1;
-                string colspanAttr = gridSpan > 1 ? $" colspan=\"{gridSpan}\"" : "";
-
-                string cellMappableAttr = (_nestedTableDepth <= maxAllowedDepth) ? "true" : "false";
-
-                htmlBuilder.Append($"<td data-mappable=\"{cellMappableAttr}\" data-element-id=\"{cellId}\" " +
-                                  $"data-type=\"cell\" data-docx-path=\"{cellPath}\" " +
-                                  $"data-nested-depth=\"{_nestedTableDepth}\" " +
-                                  $"style='{cellStyle}'{colspanAttr}>");
-
-                if (!cell.Elements<Paragraph>().Any())
-                {
-                    var emptyParagraphPath = $"{cellPath}.p[0]";
-                    var emptyParagraphId = GenerateUniqueElementId("p");
-                    _elementIdMap[emptyParagraphPath] = emptyParagraphId;
-
-                    string defaultRunStyle = GetDefaultRunStyle(mainPart);
-                    string emptyParagraphStyle = $"margin: 0; padding: 0; min-height: 1em; {defaultRunStyle}";
-
-                    htmlBuilder.Append($"<p data-mappable=\"{cellMappableAttr}\" data-element-id=\"{emptyParagraphId}\" " +
-                                      $"data-type=\"paragraph\" data-docx-path=\"{emptyParagraphPath}\" " +
-                                      $"data-nested-depth=\"{_nestedTableDepth}\" style='{emptyParagraphStyle}'>");
-                    htmlBuilder.Append("&nbsp;");
-                    htmlBuilder.Append("</p>");
-                }
-                else
-                {
-                    int cellParagraphIndex = 0;
-                    foreach (var cellElement in cell.Elements())
-                    {
-                        if (cellElement is Paragraph cellParagraph)
-                        {
-                            ProcessParagraphWithPath(cellParagraph, mainPart, htmlBuilder, $"{cellPath}.p[{cellParagraphIndex}]", maxTableNestingLevel, isViewMode);
-                            cellParagraphIndex++;
-                        }
-                        else if (cellElement is Table nestedTable)
-                        {
-                            ProcessTableWithPath(nestedTable, mainPart, htmlBuilder, $"{cellPath}.tbl[0]", maxTableNestingLevel, isViewMode);
-                        }
-                    }
-                }
-                htmlBuilder.Append("</td>");
-                cellIndex++;
-            }
-            htmlBuilder.Append("</tr>");
-            rowIndex++;
-        }
-        htmlBuilder.Append("</table>");
-
-        _nestedTableDepth--;
-    }
-
-    private static string BuildColGroup(Table table)
-    {
-        var tableGrid = table.GetFirstChild<TableGrid>();
-        if (tableGrid == null || !tableGrid.Elements<GridColumn>().Any())
-            return "";
-
-        var gridCols = tableGrid.Elements<GridColumn>().ToList();
-        var sb = new StringBuilder();
-        sb.Append("<colgroup>");
-
-        // Calculate total width for percentage calculation
-        var totalDxa = gridCols.Sum(gc => {
-            if (uint.TryParse(gc.Width?.Value, out var width))
-                return (long)width;
-            return 0L;
-        });
-        if (totalDxa == 0) return "";
-
-        foreach (var gridCol in gridCols)
-        {
-            var dxa = 0L;
-            if (uint.TryParse(gridCol.Width?.Value, out var width))
-                dxa = (long)width;
-            if (dxa == 0)
-            {
-                sb.Append("<col>");
-                continue;
-            }
-            float pct = dxa / (float)totalDxa * 100f;
-            sb.Append($"<col style=\"width: {pct:F2}%\"></col>");
-        }
-        sb.Append("</colgroup>");
-        return sb.ToString();
-    }
-
-    private static ImagePart? GetImagePartFromDrawing(Drawing drawing, MainDocumentPart mainPart)
-    {
-        var blip = drawing.Descendants<DocumentFormat.OpenXml.Drawing.Blip>().FirstOrDefault();
-        if (blip != null)
-        {
-            var embed = blip.Embed?.Value;
-            if (embed != null)
-            {
-                return (ImagePart)mainPart.GetPartById(embed);
-            }
-        }
-        return null;
-    }
-
-    private void ProcessStructuredDocumentTag(SdtRun sdtRun, MainDocumentPart mainPart, StringBuilder htmlBuilder, string parentPath, int runIndex, bool isViewMode = false)
-    {
-        // Check if this is a checkbox content control
-        var checkBoxProp = sdtRun.SdtProperties?.GetFirstChild<CheckBox>();
-        if (checkBoxProp != null)
-        {
-            if (isViewMode)
-            {
-                // VIEW MODE: HOÀN TOÀN BỞ QUA modern checkbox - không render gì cả
+                handler(el, sb, mainPart, currentPart);
                 return;
             }
 
-            // MAPPING MODE: Render checkbox như cũ
-            // Determine if checked (simplified logic)
-            bool isChecked = false;
-            var state = sdtRun.SdtContentRun?.Descendants<SymbolChar>().FirstOrDefault();
-            if (state != null && (state.Char?.Value == "F0FC" || state.Char?.Value == "F0FE"))
+            // Mặc định: bỏ qua phần tử không hỗ trợ (tránh hiển thị XML thô ra UI)
+            // Nếu sau này cần debug, có thể thêm cờ để bật lại hành vi render XML thô.
+            return;
+        }
+
+        private void ProcessChildren(OpenXmlElement parent, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            foreach (var child in parent.ChildElements)
+                ProcessElement(child, sb, mainPart, currentPart);
+        }
+
+        private void HandleParagraph(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var p = (W.Paragraph)el;
+            var paraId = p.ParagraphId?.Value ?? "";
+            var partUri = (currentPart ?? (OpenXmlPart)mainPart)?.Uri?.ToString() ?? "";
+
+            // pPr cơ bản: căn lề và thụt dòng
+            var classes = new List<string> { "w-p" };
+            var styleSb = new StringBuilder();
+
+            var pPr = p.ParagraphProperties;
+            string? paraStyleIdForDebug = pPr?.ParagraphStyleId?.Val?.Value;
+            string jcSource = "none";
+            string? jcRaw = null;
+
+            // --- ALIGNMENT (áp dụng cả khi pPr=null) ---
+            string? jcLower = null;
+            var styleId = pPr?.ParagraphStyleId?.Val?.Value;
+            // Ưu tiên: pPr.Justification; nếu không có, lấy từ style chain
+            W.Justification? jcElem = pPr?.Justification ?? GetStyleProperty(styleId, mainPart, s => s.StyleParagraphProperties?.Justification);
+            var jcFromPPrOrStyle = GetJustificationString(jcElem);
+            if (!string.IsNullOrEmpty(jcFromPPrOrStyle))
             {
-                // Wingdings F0FE = checked, F0FC = tick
-                isChecked = true;
+                jcRaw = jcFromPPrOrStyle;
+                jcLower = jcRaw.ToLowerInvariant();
+                jcSource = (pPr?.Justification != null) ? "pPr" : (!string.IsNullOrEmpty(styleId) ? $"style:{styleId}" : "style");
+            }
+            else
+            {
+                var jcDefault = ResolveDefaultParagraphJustification(mainPart);
+                if (!string.IsNullOrEmpty(jcDefault))
+                {
+                    jcRaw = jcDefault;
+                    jcLower = jcRaw.ToLowerInvariant();
+                    jcSource = "defaultStyle";
+                }
+
+                if (string.IsNullOrEmpty(jcLower))
+                {
+                    // 4) Fallback nữa: docDefaults
+                    var jcDocDefaults = ResolveDocDefaultsParagraphJustification(mainPart);
+                    if (!string.IsNullOrEmpty(jcDocDefaults))
+                    {
+                        jcRaw = jcDocDefaults;
+                        jcLower = jcRaw.ToLowerInvariant();
+                        jcSource = "docDefaults";
+                    }
+                }
             }
 
-            // Render checkbox icon (non-mappable)
-            htmlBuilder.Append($"<span data-mappable=\"false\" data-id=\"chk-{_checkboxIndex}\" " +
-                              $"data-type=\"checkbox\" data-docx-path=\"{parentPath}.r[{runIndex}].sdt\" " +
-                              $"style=\"display: inline-block; margin-right: 3px; font-size: 14px; color: #333;\">");
-            htmlBuilder.Append(isChecked ? "<i class=\"ti ti-checkbox\"></i>" : "<i class=\"ti ti-square\"></i>");
-            htmlBuilder.Append("</span>");
-
-            _checkboxIndex++;
-
-            // IMPORTANT: Also render any text content after checkbox
-            foreach (var child in sdtRun.SdtContentRun?.Elements() ?? Enumerable.Empty<OpenXmlElement>())
+            if (!string.IsNullOrEmpty(jcLower))
             {
-                if (child is Run run)
+                switch (jcLower)
                 {
-                    foreach (var text in run.Descendants<Text>())
+                    case "center": classes.Add("w-align-center"); break;
+                    case "right": classes.Add("w-align-right"); break;
+                    case "both": classes.Add("w-align-justify"); break; // justify
+                    case "justify": classes.Add("w-align-justify"); break;
+                    case "distribute": classes.Add("w-align-justify"); break;
+                    case "start": classes.Add("w-align-left"); break;
+                    case "end": classes.Add("w-align-right"); break;
+                }
+            }
+
+            // --- INDENTATION: chỉ khi có pPr ---
+            if (pPr != null)
+            {
+                // Indentation (twips -> px). 1 twip = 1/1440 inch; px = inch*96 => px = twip * 96 / 1440 = twip * 0.0666667
+                double TwipToPx(long twip) => Math.Round(twip * 0.0666667, 2);
+
+                var ind = pPr.Indentation;
+                if (ind != null)
+                {
+                    if (ind.Left != null && long.TryParse(ind.Left.Value, out var leftTw))
+                        styleSb.Append($"margin-left:{TwipToPx(leftTw)}px;");
+                    if (ind.Right != null && long.TryParse(ind.Right.Value, out var rightTw))
+                        styleSb.Append($"margin-right:{TwipToPx(rightTw)}px;");
+                    if (ind.FirstLine != null && long.TryParse(ind.FirstLine.Value, out var flTw))
+                        styleSb.Append($"text-indent:{TwipToPx(flTw)}px;");
+                    if (ind.Hanging != null && long.TryParse(ind.Hanging.Value, out var hangTw))
+                        styleSb.Append($"text-indent:-{TwipToPx(hangTw)}px;");
+                }
+            }
+
+            // --- NUMBERING (numPr) ---
+            int? numId = null; int? ilvl = null; string? numFmt = null; string? lvlText = null; int? startVal = null;
+            TryResolveNumbering(p, mainPart, out numId, out ilvl, out numFmt, out lvlText, out startVal);
+            var nfmt = NormalizeNumFmt(numFmt, lvlText);
+            if (numId.HasValue && ilvl.HasValue)
+            {
+                classes.Add("w-num");
+                classes.Add($"w-lvl-{ilvl.Value}");
+                if (!string.IsNullOrEmpty(nfmt))
+                {
+                    classes.Add($"w-num-{nfmt}");
+                }
+            }
+
+            // Phát hiện đoạn chỉ chứa checkbox đơn lẻ (□ hoặc ☑) để ẩn khỏi UI (tránh ô vuông lơ lửng)
+            bool isCheckboxOnly = IsCheckboxOnlyParagraph(p);
+
+            var classAttr = string.Join(' ', classes);
+            sb.Append($"<p class=\"{classAttr}\" data-oxml=\"w:p\" data-paragraph-id=\"{WebUtility.HtmlEncode(paraId)}\" data-part-uri=\"{WebUtility.HtmlEncode(partUri)}\"");
+            if (!string.IsNullOrEmpty(paraStyleIdForDebug))
+                sb.Append($" data-style-id=\"{WebUtility.HtmlEncode(paraStyleIdForDebug)}\"");
+            if (!string.IsNullOrEmpty(jcSource) && jcSource != "none")
+                sb.Append($" data-jc-source=\"{WebUtility.HtmlEncode(jcSource)}\"");
+            sb.Append($" data-jc-val=\"{WebUtility.HtmlEncode(jcRaw ?? "none")}\"");
+            if (numId.HasValue)
+                sb.Append($" data-num-id=\"{numId.Value}\"");
+            if (ilvl.HasValue)
+                sb.Append($" data-ilvl=\"{ilvl.Value}\"");
+            if (!string.IsNullOrEmpty(nfmt))
+            {
+                sb.Append($" data-num-fmt=\"{WebUtility.HtmlEncode(nfmt.ToLowerInvariant())}\"");
+                sb.Append($" data-num-fmt-lc=\"{WebUtility.HtmlEncode(nfmt.ToLowerInvariant())}\"");
+            }
+            if (!string.IsNullOrEmpty(lvlText))
+                sb.Append($" data-lvl-text=\"{WebUtility.HtmlEncode(lvlText)}\"");
+            if (startVal.HasValue)
+                sb.Append($" data-start=\"{startVal.Value}\"");
+            if (isCheckboxOnly)
+                sb.Append(" data-checkbox-only=\"true\"");
+            if (styleSb.Length > 0)
+                sb.Append($" style=\"{WebUtility.HtmlEncode(styleSb.ToString())}\"");
+            sb.Append(">");
+            // Chèn soft-gap giữa các w:r liền kề nếu cần (không thay đổi nội dung/offset)
+            bool usedSoftGap = ProcessParagraphChildrenWithSoftGaps(p, sb, mainPart, currentPart ?? mainPart);
+            if (usedSoftGap)
+            {
+                // Gắn cờ để CSS không áp dụng fallback margin
+                // (Chèn trực tiếp thuộc tính vào phần tử vừa được mở)
+                // Không thể sửa thuộc tính sau khi đã append, nên thêm như data-attr trong close tag thông qua 1 marker.
+            }
+            sb.Append("</p>");
+        }
+
+        // Render children của paragraph và chèn soft-gap giữa 2 run liền kề khi thiếu khoảng trắng.
+        // Trả về true nếu có chèn ít nhất một soft-gap.
+        private bool ProcessParagraphChildrenWithSoftGaps(W.Paragraph p, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            bool injectedAny = false;
+            var children = p.ChildElements.ToList();
+            for (int i = 0; i < children.Count; i++)
+            {
+                var child = children[i];
+                ProcessElement(child, sb, mainPart, currentPart);
+
+                if (i + 1 < children.Count)
+                {
+                    var next = children[i + 1];
+                    if (child is W.Run r1 && next is W.Run r2)
                     {
-                        if (!string.IsNullOrWhiteSpace(text.Text))
+                        if (NeedSoftGapBetween(r1, r2))
                         {
-                            htmlBuilder.Append($"<span data-mappable=\"true\" data-id=\"r-{_paragraphIndex}-{runIndex}-text\" " +
-                                              $"data-type=\"run\" data-docx-path=\"{parentPath}.r[{runIndex}].text\">");
-                            htmlBuilder.Append(WebUtility.HtmlEncode(text.Text));
-                            htmlBuilder.Append("</span>");
+                            // Soft-gap: phần tử rỗng chỉ-UI, không thêm ký tự
+                            sb.Append("<span class=\"w-soft-gap\" aria-hidden=\"true\"></span>");
+                            injectedAny = true;
                         }
                     }
                 }
             }
-            return;
+
+            return injectedAny;
         }
 
-        // Not a checkbox - render content normally
-        foreach (var child in sdtRun.SdtContentRun?.Elements() ?? Enumerable.Empty<OpenXmlElement>())
+        // Quyết định có cần soft-gap giữa 2 run liền kề không: khi bên trái kết thúc bằng chữ/số,
+        // bên phải bắt đầu bằng chữ/số, và không có khoảng trắng.
+        private static bool NeedSoftGapBetween(W.Run left, W.Run right)
         {
-            if (child is Run run)
-            {
-                foreach (var text in run.Descendants<Text>())
-                    htmlBuilder.Append(WebUtility.HtmlEncode(text.Text));
-            }
-        }
-    }
+            char? last = GetLastVisibleChar(left);
+            char? first = GetFirstVisibleChar(right);
+            if (last == null || first == null) return false;
 
-    private bool HasCheckboxFormField(FieldChar fieldChar)
-    {
-        if (fieldChar?.FieldCharType?.Value != FieldCharValues.Begin)
+            // Nếu đã có khoảng trắng ở biên, không cần
+            if (char.IsWhiteSpace(last.Value) || char.IsWhiteSpace(first.Value)) return false;
+
+            // Bỏ qua khi phải là dấu câu (không cần space trước dấu)
+            if (IsPunctuationLeading(first.Value)) return false;
+
+            // Chỉ chèn khi cả hai phía là chữ/số (tách từ) để tránh chèn giữa cùng một từ
+            if ((char.IsLetterOrDigit(last.Value) || IsVietnameseLetter(last.Value))
+                && (char.IsLetterOrDigit(first.Value) || IsVietnameseLetter(first.Value)))
+            {
+                return true;
+            }
             return false;
-
-        var nextSibling = fieldChar.NextSibling();
-        while (nextSibling != null)
-        {
-            if (nextSibling is Run run)
-            {
-                var instrText = run.Elements<FieldCode>().FirstOrDefault();
-                if (instrText != null && instrText.Text.Contains("FORMCHECKBOX"))
-                {
-                    return true;
-                }
-            }
-            nextSibling = nextSibling.NextSibling();
         }
-        return false;
-    }
 
-    private string ParseParagraphProperties(ParagraphProperties? pPr, MainDocumentPart mainPart)
-    {
-        // Start with Word-like default spacing
-        var styles = new List<string> { "margin: 0", "padding: 0", "line-height: 1.15" };
-        if (pPr == null) return string.Join("; ", styles) + ";";
-
-        var styleId = pPr.ParagraphStyleId?.Val?.Value;
-
-        // Handle text alignment
-        var jc = pPr.Justification ?? GetStyleProperty(styleId, mainPart, s => s.StyleParagraphProperties?.Justification);
-        if (jc?.Val?.Value != null)
+        private static char? GetLastVisibleChar(W.Run r)
         {
-            var justificationMap = new Dictionary<JustificationValues, string>
+            var t = r.Descendants<W.Text>().LastOrDefault();
+            if (t == null || string.IsNullOrEmpty(t.Text)) return null;
+            return t.Text.Last();
+        }
+
+        private static char? GetFirstVisibleChar(W.Run r)
+        {
+            var t = r.Descendants<W.Text>().FirstOrDefault();
+            if (t == null || string.IsNullOrEmpty(t.Text)) return null;
+            return t.Text.First();
+        }
+
+        private static bool IsPunctuationLeading(char c)
+        {
+            // Một số dấu câu thường gặp không cần khoảng cách trước
+            return c == ':' || c == ';' || c == ',' || c == '.' || c == ')' || c == ']' || c == '!' || c == '?' || c == '"' || c == '»';
+        }
+
+        private static bool IsVietnameseLetter(char c)
+        {
+            // Đơn giản: coi như mọi ký tự Letter theo Unicode là chữ (bao gồm tiếng Việt có dấu)
+            return char.IsLetter(c);
+        }
+
+        // Xác định đoạn chỉ chứa checkbox đơn (ví dụ: '□' hoặc '☑'), bỏ qua field/bookmark và khoảng trắng
+        private static bool IsCheckboxOnlyParagraph(W.Paragraph p)
+        {
+            // Thu thập mọi node W.Text
+            var texts = p.Descendants<W.Text>().Select(t => t.Text ?? string.Empty);
+            if (!texts.Any()) return false;
+
+            var combined = string.Concat(texts);
+            if (string.IsNullOrWhiteSpace(combined)) return false;
+
+            var visible = combined.Trim();
+            // Một số ký tự checkbox phổ biến
+            return string.Equals(visible, "\u25A1") // □
+                   || string.Equals(visible, "\u2611") // ☑
+                   || string.Equals(visible, "□", StringComparison.Ordinal)
+                   || string.Equals(visible, "☑", StringComparison.Ordinal);
+        }
+
+        private static void TryResolveNumbering(W.Paragraph p, MainDocumentPart mainPart,
+            out int? numId, out int? ilvl, out string? numFmt, out string? lvlText, out int? startVal)
+        {
+            numId = null; ilvl = null; numFmt = null; lvlText = null; startVal = null;
+            var pPr = p.ParagraphProperties;
+            var numPr = pPr?.NumberingProperties;
+            if (numPr == null) return;
+
+            if (numPr.NumberingId?.Val?.Value != null)
+                numId = (int)numPr.NumberingId.Val.Value;
+            if (numPr.NumberingLevelReference?.Val?.Value != null)
+                ilvl = (int)numPr.NumberingLevelReference.Val.Value;
+            if (!numId.HasValue || !ilvl.HasValue) return;
+            var numIdLocal = numId.Value;
+            var ilvlLocal = ilvl.Value;
+
+            var numbering = mainPart.NumberingDefinitionsPart?.Numbering;
+            if (numbering == null) return;
+
+            // numId -> abstractNumId
+            var num = numbering.Elements<W.NumberingInstance>()
+                               .FirstOrDefault(n => n.NumberID?.Value == numIdLocal);
+            if (num == null) return;
+            var absId = num.AbstractNumId?.Val?.Value;
+            if (absId == null) return;
+
+            var abs = numbering.Elements<W.AbstractNum>()
+                               .FirstOrDefault(a => a.AbstractNumberId?.Value == absId);
+            if (abs == null) return;
+
+            var lvl = abs.Elements<W.Level>().FirstOrDefault(l => l.LevelIndex?.Value == ilvlLocal);
+            if (lvl == null) return;
+
+            var nf = lvl.NumberingFormat?.Val; // EnumValue<NumberFormatValues>
+            if (nf != null && nf.HasValue)
+                numFmt = nf.Value.ToString(); // e.g., Bullet, Decimal, LowerLetter
+            lvlText = lvl.LevelText?.Val?.Value;      // e.g., "%1.", "•", "-", or Wingdings PUA glyph
+
+            // Nếu bullet của level dùng font Wingdings 2 hoặc lvlText là ký tự thuộc Private Use Area (Wingdings/Symbol),
+            // chuẩn hóa về ký tự Unicode ô vuông rỗng để hiển thị đúng và ổn định,
+            // TRỪ KHI lvlText vốn là các ký tự ASCII đơn giản mà ta cần giữ nguyên như '-', '+', '*'
+            if ((IsWingdings2ForLevel(lvl) || IsPrivateUseGlyph(lvlText)) && !ShouldKeepOriginalBullet(lvlText))
             {
-                { JustificationValues.Center, "center" },
-                { JustificationValues.Right, "right" },
-                { JustificationValues.Both, "justify" },
-                { JustificationValues.Left, "left" }
+                // Dùng một ký tự duy nhất để không thay đổi offset
+                lvlText = "\u25A1"; // □
+                // Đảm bảo front-end nhận diện là bullet để áp dụng ::before
+                numFmt = "bullet";
+            }
+
+            // SUY LUẬN BULLET khi numFmt không có nhưng lvlText là ký hiệu
+            if (string.IsNullOrEmpty(numFmt))
+            {
+                if (IsBulletLike(lvlText)) numFmt = "bullet";
+            }
+            startVal = lvl.StartNumberingValue?.Val?.Value;
+        }
+
+        private static bool IsBulletLike(string? lvlText)
+        {
+            if (string.IsNullOrWhiteSpace(lvlText)) return false;
+            // Nếu mẫu có chứa % (placeholder số), coi như numbering theo số/chữ, không phải bullet thuần
+            if (lvlText.Contains('%')) return false;
+            var trimmed = lvlText.Trim();
+            // Một số bullet phổ biến trong Word
+            var bullets = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "-",            // U+002D Hyphen-Minus
+                "+",            // U+002B Plus
+                "*",            // U+002A Asterisk
+                "o",            // U+006F Latin Small Letter o
+                "•",            // U+2022 Bullet
+                "·",            // U+00B7 Middle Dot (Symbol code 183)
+                "§",            // U+00A7 Section Sign (Wingdings code 167 mapping case)
+                "–",            // U+2013 En Dash
+                "—",            // U+2014 Em Dash
+                "◦",            // U+25E6 White Bullet
+                "▪",            // U+25AA Black Small Square
+                "■",            // U+25A0 Black Square
+                "●"             // U+25CF Black Circle
             };
+            if (bullets.Contains(trimmed)) return true;
+            // Nếu độ dài ngắn (<=3) và không có chữ số/chữ cái, tạm coi là bullet ký hiệu
+            if (trimmed.Length <= 3 && !trimmed.Any(char.IsLetterOrDigit)) return true;
+            return false;
+        }
 
-            if (justificationMap.TryGetValue(jc.Val.Value, out var alignValue))
+        private static string? ResolveParagraphJustificationFromStyle(MainDocumentPart mainPart, string styleId)
+        {
+            var styles = mainPart.StyleDefinitionsPart?.Styles;
+            if (styles == null) return null;
+
+            W.Style? current = styles.Elements<W.Style>()
+                .FirstOrDefault(s => string.Equals(s.StyleId?.Value, styleId, StringComparison.OrdinalIgnoreCase));
+
+            while (current != null)
             {
-                styles.Add($"text-align: {alignValue}");
-            }
-        }
+                var jc = GetJustificationString(current.StyleParagraphProperties?.Justification);
+                if (!string.IsNullOrEmpty(jc)) return jc;
 
-        // Handle paragraph spacing (before/after)
-        var spacingBefore = pPr.SpacingBetweenLines?.Before?.Value;
-        var spacingAfter = pPr.SpacingBetweenLines?.After?.Value;
-        var lineSpacing = pPr.SpacingBetweenLines?.Line?.Value;
+                var basedOnId = current.BasedOn?.Val?.Value;
+                if (string.IsNullOrEmpty(basedOnId)) break;
 
-        if (spacingBefore != null)
-        {
-            // Convert from twentieths of a point to CSS points
-            var beforePt = int.Parse(spacingBefore) / 20.0;
-            styles.Add($"margin-top: {beforePt}pt");
-        }
-
-        if (spacingAfter != null)
-        {
-            // Convert from twentieths of a point to CSS points
-            var afterPt = int.Parse(spacingAfter) / 20.0;
-            styles.Add($"margin-bottom: {afterPt}pt");
-        }
-
-        if (lineSpacing != null)
-        {
-            // Handle line spacing - Word uses different units
-            var lineRule = pPr.SpacingBetweenLines?.LineRule?.Value;
-            if (lineRule == LineSpacingRuleValues.Auto)
-            {
-                // Auto line spacing - convert to CSS line-height
-                var lineHeight = int.Parse(lineSpacing) / 240.0; // 240 = 12pt * 20 (twentieths of point)
-                styles.RemoveAll(s => s.StartsWith("line-height:"));
-                styles.Add($"line-height: {lineHeight:F2}");
-            }
-        }
-
-        // Handle indentation for bullets and regular paragraphs
-        var indentation = pPr.Indentation;
-        if (indentation != null)
-        {
-            if (indentation.Left?.Value != null)
-            {
-                var leftIndentPt = int.Parse(indentation.Left.Value) / 20.0;
-                styles.Add($"margin-left: {leftIndentPt}pt");
+                current = styles.Elements<W.Style>()
+                    .FirstOrDefault(s => string.Equals(s.StyleId?.Value, basedOnId, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (indentation.Right?.Value != null)
-            {
-                var rightIndentPt = int.Parse(indentation.Right.Value) / 20.0;
-                // Limit excessive margin-right to prevent images from being pushed out of view
-                // Word documents sometimes have very large right indentation that breaks layout
-                var maxRightMargin = 10.0; // Maximum 10pt margin-right
-                var limitedRightIndent = Math.Min(rightIndentPt, maxRightMargin);
-                styles.Add($"margin-right: {limitedRightIndent}pt");
-            }
-
-            if (indentation.FirstLine?.Value != null)
-            {
-                var firstLineIndentPt = int.Parse(indentation.FirstLine.Value) / 20.0;
-                styles.Add($"text-indent: {firstLineIndentPt}pt");
-            }
-        }
-
-        // Handle numbering properties (bullets/numbering)
-        var numberingProperties = pPr.NumberingProperties;
-        if (numberingProperties != null && indentation?.Left?.Value == null)
-        {
-            // Default bullet indentation if not explicitly set
-            styles.Add("margin-left: 18pt"); // Word default bullet indent
-        }
-
-        return string.Join("; ", styles) + ";";
-    }
-
-    private string ParseRunProperties(RunProperties? rPr, MainDocumentPart mainPart)
-    {
-        var styles = new List<string>();
-        if (rPr == null) return string.Empty;
-
-        var styleId = rPr.RunStyle?.Val?.Value;
-
-        // Bold
-        var isBold = rPr.Bold ?? GetStyleProperty(styleId, mainPart, s => s.StyleRunProperties?.Bold);
-        if (isBold != null && (isBold.Val == null || isBold.Val.Value))
-            styles.Add("font-weight: bold");
-
-        // Italic
-        var isItalic = rPr.Italic ?? GetStyleProperty(styleId, mainPart, s => s.StyleRunProperties?.Italic);
-        if (isItalic != null && (isItalic.Val == null || isItalic.Val.Value))
-            styles.Add("font-style: italic");
-
-        // Font Size (CRITICAL: preserve original size)
-        var fontSize = rPr.FontSize ?? GetStyleProperty(styleId, mainPart, s => s.StyleRunProperties?.FontSize);
-        if (fontSize?.Val?.Value != null)
-        {
-            // Word uses half-points, so divide by 2
-            var sizeInPt = float.Parse(fontSize.Val.Value) / 2.0f;
-            styles.Add($"font-size: {sizeInPt}pt");
-        }
-        else
-        {
-            // Default font size to prevent oversized text
-            styles.Add("font-size: 11pt");
-        }
-
-        // Font Family
-        var fontFamily = rPr.RunFonts;
-        if (fontFamily != null)
-        {
-            var font = fontFamily.Ascii?.Value ?? fontFamily.HighAnsi?.Value ?? fontFamily.EastAsia?.Value;
-            if (!string.IsNullOrEmpty(font))
-            {
-                // Normalize known "bold" font names
-                if (font.Equals("Times New Roman Bold", StringComparison.OrdinalIgnoreCase))
-                    font = "Times New Roman";
-                else if (font.Equals("Arial Bold", StringComparison.OrdinalIgnoreCase))
-                    font = "Arial";
-
-                // Use double quotes for font names with spaces to avoid CSS parsing issues
-                if (font.Contains(" "))
-                {
-                    styles.Add($"font-family: \"{font}\", Arial, sans-serif");
-                }
-                else
-                {
-                    styles.Add($"font-family: {font}, Arial, sans-serif");
-                }
-            }
-        }
-
-        // Text Color
-        var color = rPr.Color;
-        if (color != null && !string.IsNullOrEmpty(color.Val?.Value) && color.Val.Value != "auto")
-        {
-            styles.Add($"color: #{color.Val.Value}");
-        }
-
-        // Background/Highlight
-        var highlight = rPr.Highlight;
-        if (highlight?.Val?.Value != null && highlight.Val.Value != HighlightColorValues.None)
-        {
-            styles.Add($"background-color: {highlight.Val.Value.ToString().ToLower()}");
-        }
-
-        // Underline
-        var underline = rPr.Underline;
-        if (underline != null && underline.Val?.Value != UnderlineValues.None)
-        {
-            styles.Add("text-decoration: underline");
-        }
-
-        return string.Join("; ", styles) + (styles.Count > 0 ? ";" : "");
-    }
-
-    private T? GetStyleProperty<T>(string? styleId, MainDocumentPart mainPart, Func<Style, T?> propertySelector) where T : OpenXmlElement
-    {
-        if (string.IsNullOrEmpty(styleId) || mainPart.StyleDefinitionsPart?.Styles == null)
             return null;
+        }
 
-        var style = mainPart.StyleDefinitionsPart.Styles.Elements<Style>().FirstOrDefault(s => s.StyleId == styleId);
-
-        if (style == null) return null;
-
-        var prop = propertySelector(style);
-        if (prop != null)
-            return prop;
-
-        return GetStyleProperty(style.BasedOn?.Val?.Value, mainPart, propertySelector);
-    }
-
-    /// <summary>
-    /// Gets the default run style from the document's styles part.
-    /// </summary>
-    private string GetDefaultRunStyle(MainDocumentPart mainPart)
-    {
-        // First, try to get the default run properties from the document defaults.
-        // FIX: Access the RunProperties element correctly using GetFirstChild<T>()
-        var rPrDefaultContainer = mainPart.StyleDefinitionsPart?.Styles?.DocDefaults?.RunPropertiesDefault;
-        if (rPrDefaultContainer != null)
+        private static string? ResolveDefaultParagraphJustification(MainDocumentPart mainPart)
         {
-            var defaultRunProps = rPrDefaultContainer.GetFirstChild<RunProperties>();
-            if (defaultRunProps != null)
+            var styles = mainPart.StyleDefinitionsPart?.Styles;
+            if (styles == null) return null;
+
+            var defaultParaStyle = styles.Elements<W.Style>()
+                .FirstOrDefault(s => s.Default != null && s.Default.Value
+                                     && s.Type?.Value == W.StyleValues.Paragraph);
+            var jc = GetJustificationString(defaultParaStyle?.StyleParagraphProperties?.Justification);
+            return string.IsNullOrEmpty(jc) ? null : jc;
+        }
+
+        private static string? ResolveDocDefaultsParagraphJustification(MainDocumentPart mainPart)
+        {
+            var styles = mainPart.StyleDefinitionsPart?.Styles;
+            if (styles == null) return null;
+
+            var pPrDefault = styles.DocDefaults?
+                .ParagraphPropertiesDefault?
+                .Elements<W.ParagraphProperties>()
+                .FirstOrDefault();
+            var jc = GetJustificationString(pPrDefault?.Justification);
+            return string.IsNullOrEmpty(jc) ? null : jc;
+        }
+
+        private static string? GetJustificationString(W.Justification? jc)
+        {
+            if (jc == null) return null;
+            var val = jc.Val;
+            if (val != null && val.HasValue)
             {
-                // Use the existing ParseRunProperties to convert OpenXML properties to a CSS string.
-                // We clone it to avoid any potential modification issues.
-                string defaultStyle = ParseRunProperties(new RunProperties(defaultRunProps.OuterXml), mainPart);
-                if (!string.IsNullOrEmpty(defaultStyle)) return defaultStyle;
+                var v = val.Value;
+                if (v == W.JustificationValues.Center) return "center";
+                if (v == W.JustificationValues.Right) return "right";
+                if (v == W.JustificationValues.Both) return "both";
+                if (v == W.JustificationValues.Left) return "left";
+                if (v == W.JustificationValues.Distribute) return "distribute";
+                if (v == W.JustificationValues.Start) return "start";
+                if (v == W.JustificationValues.End) return "end";
+            }
+            // Fallback: đọc trực tiếp thuộc tính XML nếu EnumValue không populate hoặc enum không thuộc nhóm hỗ trợ
+            var raw = jc.GetAttribute("val", "http://schemas.openxmlformats.org/wordprocessingml/2006/main");
+            if (!string.IsNullOrWhiteSpace(raw.Value))
+                return raw.Value.ToLowerInvariant();
+            return null;
+        }
+
+        private static T? GetStyleProperty<T>(string? styleId, MainDocumentPart mainPart, Func<W.Style, T?> selector)
+            where T : OpenXmlElement
+        {
+            if (string.IsNullOrEmpty(styleId) || mainPart.StyleDefinitionsPart?.Styles == null)
+                return null;
+
+            var styles = mainPart.StyleDefinitionsPart.Styles;
+            var style = styles.Elements<W.Style>()
+                .FirstOrDefault(s => string.Equals(s.StyleId?.Value, styleId, StringComparison.OrdinalIgnoreCase));
+            if (style == null) return null;
+
+            var prop = selector(style);
+            if (prop != null) return prop;
+
+            var basedOn = style.BasedOn?.Val?.Value;
+            if (string.IsNullOrEmpty(basedOn)) return null;
+            return GetStyleProperty(basedOn, mainPart, selector);
+        }
+
+        private void HandleRun(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var r = (W.Run)el;
+            var styleSb = new StringBuilder();
+
+            var rPr = r.RunProperties;
+            if (rPr != null)
+            {
+                // Bold/Italic (nếu có tag mà không có Val => coi như true)
+                if (rPr.Bold != null && (rPr.Bold.Val == null || rPr.Bold.Val.Value)) styleSb.Append("font-weight:bold;");
+                if (rPr.Italic != null && (rPr.Italic.Val == null || rPr.Italic.Val.Value)) styleSb.Append("font-style:italic;");
+
+                // Underline
+                var uVal = rPr.Underline?.Val?.Value;
+                if (uVal != null && uVal.ToString() != "none")
+                {
+                    styleSb.Append("text-decoration:underline;");
+                }
+
+                // Strike
+                if (rPr.Strike != null && (rPr.Strike.Val == null || rPr.Strike.Val.Value))
+                    styleSb.Append("text-decoration:line-through;");
+
+                // Color (hex without #)
+                var color = rPr.Color?.Val?.Value;
+                if (!string.IsNullOrEmpty(color))
+                {
+                    // Word có thể dùng "auto" – bỏ qua để dùng màu mặc định.
+                    if (!string.Equals(color, "auto", StringComparison.OrdinalIgnoreCase))
+                        styleSb.Append($"color:#{color};");
+                }
+
+                // Font size (half-point)
+                var sz = rPr.FontSize?.Val?.Value;
+                if (!string.IsNullOrEmpty(sz) && double.TryParse(sz, NumberStyles.Any, CultureInfo.InvariantCulture, out var halfPt))
+                {
+                    var pt = halfPt / 2.0;
+                    styleSb.Append($"font-size:{pt.ToString(CultureInfo.InvariantCulture)}pt;");
+                }
+            }
+
+            sb.Append("<span class=\"w-r\" data-oxml=\"w:r\"");
+            if (styleSb.Length > 0)
+                sb.Append($" style=\"{WebUtility.HtmlEncode(styleSb.ToString())}\"");
+            sb.Append(">");
+            ProcessChildren(r, sb, mainPart, currentPart);
+            sb.Append("</span>");
+        }
+
+        private void HandleText(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var t = (W.Text)el;
+            var run = t.Ancestors<W.Run>().FirstOrDefault();
+            var raw = t.Text ?? string.Empty;
+            // Map một-sang-một các ký tự đặc biệt (không thay đổi số lượng ký tự)
+            raw = MapSpecialSymbols(raw, run);
+            // Giữ nguyên chuỗi gốc, chỉ bao bọc placeholder bằng span, không thêm/bớt ký tự
+            sb.Append(HighlightPlaceholders(raw));
+        }
+
+        // Chuyển một-sang-một các ký tự đặc biệt để hiển thị đúng: Checkbox/Wingdings 2 code 42 -> □
+        private static string MapSpecialSymbols(string text, W.Run? run)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            // Wingdings 2 (w:rFonts @ascii/@hAnsi/@cs)
+            var font = run?.RunProperties?.RunFonts;
+            var fontName = font?.Ascii?.Value ?? font?.HighAnsi?.Value ?? font?.ComplexScript?.Value;
+            if (!string.IsNullOrEmpty(fontName) && fontName!.Equals("Wingdings 2", StringComparison.OrdinalIgnoreCase))
+            {
+                // Ký tự 42 ("*") trong Wingdings 2 thường là ô vuông rỗng
+                // Để không thay đổi số lượng ký tự: thay thế 1-1: '*' -> '□' (U+25A1)
+                var chars = text.ToCharArray();
+                for (int i = 0; i < chars.Length; i++)
+                {
+                    if (chars[i] == '*') chars[i] = '\u25A1';
+                }
+                return new string(chars);
+            }
+
+            return text;
+        }
+
+        // Xây dựng <colgroup> dựa vào w:tblGrid -> w:gridCol@w (đơn vị dxa/twips)
+        private static void BuildColGroup(W.Table tbl, StringBuilder sb)
+        {
+            var grid = tbl.Elements<W.TableGrid>().FirstOrDefault();
+            if (grid == null) return;
+
+            var cols = grid.Elements<W.GridColumn>().ToList();
+            if (cols.Count == 0) return;
+
+            // Thu thập width (twips). Nếu có cột 0 và có cột >0, gán 0 = trung bình các cột >0 để tránh bóp méo bố cục
+            var widths = new List<int>();
+            foreach (var c in cols)
+            {
+                if (int.TryParse(c.Width?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) && parsed > 0)
+                    widths.Add(parsed);
+                else
+                    widths.Add(0);
+            }
+
+            var nonZero = widths.Where(w => w > 0).ToList();
+            if (nonZero.Count > 0 && widths.Any(w => w == 0))
+            {
+                var avg = (int)Math.Max(1, Math.Round(nonZero.Average()));
+                for (int i = 0; i < widths.Count; i++) if (widths[i] == 0) widths[i] = avg;
+            }
+
+            long total = widths.Sum(w => (long)w);
+            if (total <= 0)
+            {
+                // Không có thông tin grid hợp lệ -> đừng render colgroup để tránh layout hỏng
+                return;
+            }
+
+            sb.Append("<colgroup>");
+            foreach (var w in widths)
+            {
+                var pct = w * 100.0 / total;
+                var pctStr = pct.ToString("0.####", CultureInfo.InvariantCulture);
+                sb.Append($"<col style=\"width:{pctStr}%;\">");
+            }
+            sb.Append("</colgroup>");
+        }
+
+        // Bao bọc <<...>> bằng span.placeholder-span/placeholder-empty mà không thay đổi chuỗi gốc
+        private static string HighlightPlaceholders(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+
+            var pattern = new Regex(@"<<(?<name>[^\r\n]{0,200}?)>>", RegexOptions.Compiled);
+            var sb = new StringBuilder();
+            int last = 0;
+            foreach (Match m in pattern.Matches(text))
+            {
+                if (m.Index > last)
+                {
+                    var before = text.Substring(last, m.Index - last);
+                    sb.Append(WebUtility.HtmlEncode(before));
+                }
+
+                var raw = m.Value; // ví dụ: <<FIELD>> hoặc <<>>
+                var name = m.Groups["name"].Value;
+                var isEmpty = string.IsNullOrWhiteSpace(name);
+                var classes = isEmpty ? "placeholder-span placeholder-empty" : "placeholder-span";
+                var encodedInner = WebUtility.HtmlEncode(raw);
+                var dataName = WebUtility.HtmlEncode(name);
+                sb.Append($"<span class=\"{classes}\" data-ph-name=\"{dataName}\">{encodedInner}</span>");
+
+                last = m.Index + m.Length;
+            }
+            if (last < text.Length)
+            {
+                var tail = text.Substring(last);
+                sb.Append(WebUtility.HtmlEncode(tail));
+            }
+            return sb.ToString();
+        }
+
+        private void HandleTable(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var tbl = (W.Table)el;
+            // Xác định mức lồng nhau của bảng để áp dụng class phù hợp
+            var nestingLevel = el.Ancestors<W.Table>().Count(); // không tính chính nó
+            var tblClass = nestingLevel == 0 ? "parent-table" : "nested-table";
+
+            // Đọc w:tblPr/w:tblW để áp width
+            string? widthStyle = null;
+            var tblPr = tbl.GetFirstChild<W.TableProperties>();
+            var tblW = tblPr?.TableWidth;
+            if (tblW != null)
+            {
+                var type = tblW.Type != null ? tblW.Type.Value.ToString().ToLowerInvariant() : null;
+                var wValStr = tblW.Width?.Value;
+                if (!string.IsNullOrWhiteSpace(type) && !string.IsNullOrWhiteSpace(wValStr))
+                {
+                    if (type == "pct")
+                    {
+                        if (int.TryParse(wValStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var fiftieths))
+                        {
+                            // pct trong Word = phần trăm * 50 (5000 = 100%)
+                            var pct = Math.Max(0, fiftieths) / 50.0;
+                            widthStyle = $"width:{pct.ToString("0.##", CultureInfo.InvariantCulture)}%;";
+                        }
+                    }
+                    else if (type == "dxa")
+                    {
+                        if (int.TryParse(wValStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var twips) && twips > 0)
+                        {
+                            // 1 twip = 1/20 pt; px = pt * 96/72 => px = twips * 96 / 1440 = twips / 15
+                            var px = twips / 15.0;
+                            widthStyle = $"width:{px.ToString("0.##", CultureInfo.InvariantCulture)}px;";
+                        }
+                    }
+                    else if (type == "auto")
+                    {
+                        widthStyle = null; // để auto theo CSS
+                    }
+                }
+            }
+
+            sb.Append($"<table class=\"w-tbl {tblClass}\" data-nested-depth=\"{nestingLevel}\"");
+            if (!string.IsNullOrEmpty(widthStyle)) sb.Append($" style=\"{WebUtility.HtmlEncode(widthStyle)}\"");
+            sb.Append(">");
+
+            // Dựng colgroup nếu có w:tblGrid
+            BuildColGroup(tbl, sb);
+
+            ProcessChildren(el, sb, mainPart, currentPart);
+            sb.Append("</table>");
+        }
+
+        private void HandleTableRow(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            sb.Append("<tr class=\"w-tr\">");
+            ProcessChildren(el, sb, mainPart, currentPart);
+            sb.Append("</tr>");
+        }
+
+        private void HandleTableCell(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var tc = (W.TableCell)el;
+            var tcPr = tc.TableCellProperties;
+            int colspan = 1;
+            var gridSpanVal = tcPr?.GridSpan?.Val?.Value;
+            if (gridSpanVal.HasValue && gridSpanVal.Value > 1)
+                colspan = gridSpanVal.Value;
+
+            string? style = null;
+            var shd = tcPr?.Shading; // w:tcPr/w:shd
+            if (shd != null)
+            {
+                var fill = shd.Fill?.Value;
+                if (!string.IsNullOrWhiteSpace(fill) && !fill!.Equals("auto", StringComparison.OrdinalIgnoreCase))
+                {
+                    style = $"background-color:#{fill};";
+                }
+            }
+
+            sb.Append("<td class=\"w-td\"");
+            if (colspan > 1) sb.Append($" colspan=\"{colspan}\"");
+            if (!string.IsNullOrEmpty(style)) sb.Append($" style=\"{WebUtility.HtmlEncode(style)}\"");
+            sb.Append(">");
+            ProcessChildren(tc, sb, mainPart, currentPart);
+            sb.Append("</td>");
+        }
+
+        private void HandleBreak(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
+        {
+            var br = (W.Break)el;
+            // Value của Enum (BreakValues) là value-type, không thể dùng toán tử ?. trực tiếp trên nó
+            // Kiểm tra null ở cấp EnumValue trước, sau đó gọi ToString() bình thường
+            string type = br.Type != null ? br.Type.Value.ToString() : "textWrapping";
+            sb.Append($"<br class=\"w-br\" data-oxml=\"w:br\" data-br-type=\"{WebUtility.HtmlEncode(type)}\"/>");
+        }
+
+        private void HandleTab(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
+        {
+            sb.Append("<span class=\"w-tab\" data-oxml=\"w:tab\">&#9;</span>");
+        }
+
+        private void HandleHyperlink(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var link = (W.Hyperlink)el;
+            string? href = null;
+            string? anchor = link.Anchor?.Value;
+            var rid = link.Id?.Value;
+
+            if (!string.IsNullOrEmpty(rid))
+            {
+                var rel = currentPart?.HyperlinkRelationships?.FirstOrDefault(r => r.Id == rid)
+                        ?? mainPart.HyperlinkRelationships.FirstOrDefault(r => r.Id == rid);
+                href = rel?.Uri?.ToString();
+            }
+            if (!string.IsNullOrEmpty(anchor))
+            {
+                href = "#" + anchor;
+            }
+
+            sb.Append("<a class=\"w-hyperlink\" data-oxml=\"w:hyperlink\"");
+            if (!string.IsNullOrEmpty(href))
+                sb.Append($" href=\"{WebUtility.HtmlEncode(href)}\"");
+            if (!string.IsNullOrEmpty(anchor))
+                sb.Append($" data-anchor=\"{WebUtility.HtmlEncode(anchor)}\"");
+            if (!string.IsNullOrEmpty(rid))
+                sb.Append($" data-rid=\"{WebUtility.HtmlEncode(rid)}\"");
+            sb.Append(">");
+
+            ProcessChildren(link, sb, mainPart, currentPart ?? mainPart);
+            sb.Append("</a>");
+        }
+
+        private void HandleBookmarkStart(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
+        {
+            var b = (W.BookmarkStart)el;
+            var idStr = b.Id?.Value?.ToString() ?? "";
+            var nameStr = b.Name?.Value ?? "";
+            var safeId = WebUtility.HtmlEncode(idStr);
+            var safeName = WebUtility.HtmlEncode(nameStr);
+            sb.Append($"<span class=\"w-bookmark-start\" data-oxml=\"w:bookmarkStart\" data-bmk-id=\"{safeId}\" data-bmk-name=\"{safeName}\"></span>");
+
+            // Heuristic: Một số tài liệu không có w:instrText FORMCHECKBOX, nhưng có bookmark tên 'Check*'
+            // Nếu đang trong ngữ cảnh field và tên bookmark gợi ý checkbox, gắn loại là FormCheckbox
+            if (_fieldStack.Count > 0 && !string.IsNullOrWhiteSpace(nameStr))
+            {
+                var ctx = _fieldStack.Peek();
+                if (ctx.Kind == FieldContextKind.Unknown)
+                {
+                    var nameLc = nameStr.Trim().ToLowerInvariant();
+                    if (nameLc.StartsWith("check") || nameLc.Contains("checkbox") || nameLc.StartsWith("cb"))
+                    {
+                        ctx.Kind = FieldContextKind.FormCheckbox;
+                    }
+                }
             }
         }
 
-        // As a fallback, try to get the run properties from the "Normal" style.
-        var normalStyle = mainPart.StyleDefinitionsPart?.Styles?.Elements<Style>()
-            .FirstOrDefault(s => s.StyleId == "Normal" && s.Type == StyleValues.Paragraph);
-        var rPrNormal = normalStyle?.StyleRunProperties;
-        if (rPrNormal != null)
+        private void HandleBookmarkEnd(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
         {
-            string normalStyleCss = ParseRunProperties(new RunProperties(rPrNormal.OuterXml), mainPart);
-            if (!string.IsNullOrEmpty(normalStyleCss)) return normalStyleCss;
+            var b = (W.BookmarkEnd)el;
+            sb.Append($"<span class=\"w-bookmark-end\" data-oxml=\"w:bookmarkEnd\" data-bmk-id=\"{b.Id?.Value}\"></span>");
         }
 
-        // If all else fails, return a hardcoded default.
-        return "font-family: 'Times New Roman', Times, serif; font-size: 11pt;";
-    }
-
-    private string ParseTableProperties(TableProperties? tblPr)
-    {
-        if (tblPr == null) return "width: 100%; table-layout: fixed; border-collapse: collapse;";
-
-        var styles = new List<string> { "width: 100%", "table-layout: fixed", "border-collapse: collapse" };
-
-        // Enhanced border handling for nested tables
-        var borders = tblPr.TableBorders;
-        if (borders != null && HasVisibleBorders(borders))
+        private void HandleFieldSimple(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
         {
-            // Add outer border for table
-            styles.Add("border: 1px solid #000");
+            var f = (W.SimpleField)el;
+            string instr = f.Instruction?.Value ?? "";
+            sb.Append($"<span class=\"w-field\" data-oxml=\"w:fldSimple\" data-instr=\"{WebUtility.HtmlEncode(instr)}\">");
+            ProcessChildren(f, sb, mainPart, currentPart);
+            sb.Append("</span>");
         }
 
-        // Ensure nested tables also get proper border styling
-        var insideH = borders?.InsideHorizontalBorder;
-        var insideV = borders?.InsideVerticalBorder;
-        if ((insideH?.Val?.Value != BorderValues.None && insideH?.Val?.Value != BorderValues.Nil) ||
-            (insideV?.Val?.Value != BorderValues.None && insideV?.Val?.Value != BorderValues.Nil))
+        
+
+        private void HandleFieldChar(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
         {
-            // This will be handled by cell borders, but ensure collapse is set
-            styles.RemoveAll(s => s.StartsWith("border-collapse:"));
-            styles.Add("border-collapse: collapse");
-        }
+            var fc = (W.FieldChar)el;
+            var type = fc.FieldCharType?.Value;
+            if (type == null)
+            {
+                sb.Append("<span class=\"w-fldChar\" data-oxml=\"w:fldChar\" data-type=\"unknown\"></span>");
+                return;
+            }
 
-        return string.Join("; ", styles);
-    }
-
-    private static bool HasVisibleBorders(TableBorders borders)
-    {
-        // Check if any border is visible (not none or nil)
-        return (borders.TopBorder?.Val?.Value != BorderValues.None && borders.TopBorder?.Val?.Value != BorderValues.Nil) ||
-               (borders.BottomBorder?.Val?.Value != BorderValues.None && borders.BottomBorder?.Val?.Value != BorderValues.Nil) ||
-               (borders.LeftBorder?.Val?.Value != BorderValues.None && borders.LeftBorder?.Val?.Value != BorderValues.Nil) ||
-               (borders.RightBorder?.Val?.Value != BorderValues.None && borders.RightBorder?.Val?.Value != BorderValues.Nil);
-    }
-
-    private static bool HasVisibleCellBorders(TableCellBorders borders)
-    {
-        // Check if any cell border is visible (not none or nil)
-        return (borders.TopBorder?.Val?.Value != BorderValues.None && borders.TopBorder?.Val?.Value != BorderValues.Nil) ||
-               (borders.BottomBorder?.Val?.Value != BorderValues.None && borders.BottomBorder?.Val?.Value != BorderValues.Nil) ||
-               (borders.LeftBorder?.Val?.Value != BorderValues.None && borders.LeftBorder?.Val?.Value != BorderValues.Nil) ||
-               (borders.RightBorder?.Val?.Value != BorderValues.None && borders.RightBorder?.Val?.Value != BorderValues.Nil);
-    }
-
-    private string ParseTableCellProperties(TableCellProperties? tcPr)
-    {
-        if (tcPr == null) return "padding: 4px; vertical-align: top; border: 1px solid #ccc;";
-
-        var styles = new List<string> { "padding: 4px", "vertical-align: top" };
-
-        // Enhanced border handling for nested table cells
-        var borders = tcPr.TableCellBorders;
-        if (borders != null && HasVisibleCellBorders(borders))
-        {
-            // Add specific borders based on DOCX cell borders
-            var borderParts = new List<string>();
-
-            if (borders.TopBorder?.Val?.Value != BorderValues.None && borders.TopBorder?.Val?.Value != BorderValues.Nil)
-                borderParts.Add("border-top: 1px solid #000");
-            if (borders.BottomBorder?.Val?.Value != BorderValues.None && borders.BottomBorder?.Val?.Value != BorderValues.Nil)
-                borderParts.Add("border-bottom: 1px solid #000");
-            if (borders.LeftBorder?.Val?.Value != BorderValues.None && borders.LeftBorder?.Val?.Value != BorderValues.Nil)
-                borderParts.Add("border-left: 1px solid #000");
-            if (borders.RightBorder?.Val?.Value != BorderValues.None && borders.RightBorder?.Val?.Value != BorderValues.Nil)
-                borderParts.Add("border-right: 1px solid #000");
-
-            if (borderParts.Count > 0)
-                styles.AddRange(borderParts);
+            var v = type.Value;
+            if (v == W.FieldCharValues.Begin)
+            {
+                _fieldStack.Push(new FieldContext());
+                // Render dấu mốc ẩn (không có nội dung hiển thị)
+                sb.Append("<span class=\"w-fldChar\" data-oxml=\"w:fldChar\" data-type=\"begin\"></span>");
+            }
+            else if (v == W.FieldCharValues.Separate)
+            {
+                // Thời điểm bắt đầu vùng hiển thị kết quả field
+                if (_fieldStack.Count > 0)
+                {
+                    var ctx = _fieldStack.Peek();
+                    if (ctx.Kind == FieldContextKind.FormCheckbox && !ctx.Emitted)
+                    {
+                        // Chèn đúng 1 ký tự Unicode để giữ nguyên độ dài/offset văn bản
+                        sb.Append('\u25A1'); // □
+                        ctx.Emitted = true;
+                    }
+                }
+                sb.Append("<span class=\"w-fldChar\" data-oxml=\"w:fldChar\" data-type=\"separate\"></span>");
+            }
+            else if (v == W.FieldCharValues.End)
+            {
+                if (_fieldStack.Count > 0)
+                {
+                    var ctx = _fieldStack.Peek();
+                    if (ctx.Kind == FieldContextKind.FormCheckbox && !ctx.Emitted)
+                    {
+                        sb.Append('\u25A1'); // □
+                        ctx.Emitted = true;
+                    }
+                    _fieldStack.Pop();
+                }
+                sb.Append("<span class=\"w-fldChar\" data-oxml=\"w:fldChar\" data-type=\"end\"></span>");
+            }
             else
-                styles.Add("border: 1px solid #000"); // Fallback for all borders
-        }
-        else
-        {
-            // Default light border for nested tables to maintain structure
-            styles.Add("border: 1px solid #ccc");
-        }
-
-        // Do NOT set width here - colgroup handles width proportions
-        // Only handle borders, padding, vertical alignment
-
-        // Vertical alignment
-        var vAlign = tcPr.TableCellVerticalAlignment;
-        if (vAlign?.Val?.Value != null)
-        {
-            var alignmentMap = new Dictionary<TableVerticalAlignmentValues, string>
             {
-                { TableVerticalAlignmentValues.Top, "top" },
-                { TableVerticalAlignmentValues.Center, "middle" },
-                { TableVerticalAlignmentValues.Bottom, "bottom" }
-            };
-
-            if (alignmentMap.TryGetValue(vAlign.Val.Value, out var alignValue))
-            {
-                styles.RemoveAll(s => s.StartsWith("vertical-align:"));
-                styles.Add($"vertical-align: {alignValue}");
+                sb.Append($"<span class=\"w-fldChar\" data-oxml=\"w:fldChar\" data-type=\"{WebUtility.HtmlEncode(type.Value.ToString())}\"></span>");
             }
         }
 
-        // Background color/shading
-        var shading = tcPr.Shading;
-        if (shading?.Fill?.Value != null && shading.Fill.Value != "auto")
+        private void HandleInstrText(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
         {
-            var fillColor = shading.Fill.Value;
-            // Convert DOCX color format to CSS
-            if (fillColor.Length == 6 && !fillColor.StartsWith("#"))
+            var text = el.InnerText ?? string.Empty;
+            // Nếu đang ở trong một field, gom instruction và không render ra để tránh lộ code
+            if (_fieldStack.Count > 0)
             {
-                styles.Add($"background-color: #{fillColor}");
+                var ctx = _fieldStack.Peek();
+                ctx.Instr.Append(text);
+                var instrUpper = ctx.Instr.ToString().ToUpperInvariant();
+                if (ctx.Kind == FieldContextKind.Unknown)
+                {
+                    if (instrUpper.Contains("FORMCHECKBOX")) ctx.Kind = FieldContextKind.FormCheckbox;
+                    else ctx.Kind = FieldContextKind.Other;
+                }
+                return; // không render instrText ra ngoài
             }
-            else if (fillColor.Length == 6)
+            sb.Append($"<span class=\"w-instrText\" data-oxml=\"w:instrText\">{WebUtility.HtmlEncode(text)}</span>");
+        }
+
+        private void HandleFootnoteRef(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart __)
+        {
+            var f = (W.FootnoteReference)el;
+            int id = Convert.ToInt32(f.Id?.Value ?? -1);
+            if (id >= 0) _footnoteQueue.Add(id);
+
+            sb.Append($"<sup class=\"w-footnote-ref\" data-oxml=\"w:footnoteReference\" data-id=\"{id}\"><a href=\"#footnote-{id}\">{id}</a></sup>");
+        }
+
+        private void HandleEndnoteRef(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart __)
+        {
+            var f = (W.EndnoteReference)el;
+            int id = Convert.ToInt32(f.Id?.Value ?? -1);
+            if (id >= 0) _endnoteQueue.Add(id);
+
+            sb.Append($"<sup class=\"w-endnote-ref\" data-oxml=\"w:endnoteReference\" data-id=\"{id}\"><a href=\"#endnote-{id}\">{id}</a></sup>");
+        }
+
+        private void HandleCommentRef(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart __)
+        {
+            var cr = (W.CommentReference)el;
+            var id = cr.Id?.Value ?? "";
+            sb.Append($"<sup class=\"w-comment-ref\" data-oxml=\"w:commentReference\" data-id=\"{WebUtility.HtmlEncode(id)}\">[c{id}]</sup>");
+        }
+
+        private void HandleCommentRangeStart(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
+        {
+            var cs = (W.CommentRangeStart)el;
+            sb.Append($"<span class=\"w-comment-range-start\" data-oxml=\"w:commentRangeStart\" data-id=\"{WebUtility.HtmlEncode(cs.Id?.Value ?? "")}\"></span>");
+        }
+
+        private void HandleCommentRangeEnd(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
+        {
+            var ce = (W.CommentRangeEnd)el;
+            sb.Append($"<span class=\"w-comment-range-end\" data-oxml=\"w:commentRangeEnd\" data-id=\"{WebUtility.HtmlEncode(ce.Id?.Value ?? "")}\"></span>");
+        }
+
+        private void HandleSdtRun(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var sdt = (W.SdtRun)el;
+            sb.Append("<span class=\"w-sdt-run\" data-oxml=\"w:sdtRun\">");
+            ProcessChildren(sdt, sb, mainPart, currentPart);
+            sb.Append("</span>");
+        }
+
+        private void HandleSdtBlock(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var sdt = (W.SdtBlock)el;
+            sb.Append("<div class=\"w-sdt-block\" data-oxml=\"w:sdt\">");
+            ProcessChildren(sdt, sb, mainPart, currentPart);
+            sb.Append("</div>");
+        }
+
+        private void HandleSdtCell(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            var sdt = (W.SdtCell)el;
+            sb.Append("<td class=\"w-sdt-cell\" data-oxml=\"w:sdt\">");
+            ProcessChildren(sdt, sb, mainPart, currentPart);
+            sb.Append("</td>");
+        }
+
+        private void HandleDrawing(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            // Tìm a:blip để lấy r:embed (rId đến ImagePart)
+            var blip = el.Descendants<Blip>().FirstOrDefault();
+            var rId = blip?.Embed?.Value;
+
+            // Lấy kích thước từ wp:inline/wp:extent nếu có (EMU -> px)
+            int? widthPx = null, heightPx = null;
+            var extent = el.Descendants<WpDrawing.Extent>().FirstOrDefault();
+            if (extent?.Cx != null && extent?.Cy != null)
             {
-                styles.Add($"background-color: {fillColor}");
+                const double emuPerPx = 9525.0; // 914400 EMU/inch / 96 px/inch
+                try
+                {
+                    widthPx = (int)Math.Round(extent.Cx.Value / emuPerPx);
+                    heightPx = (int)Math.Round(extent.Cy.Value / emuPerPx);
+                }
+                catch { /* bỏ qua nếu parse lỗi */ }
+            }
+
+            if (!string.IsNullOrEmpty(rId))
+            {
+                try
+                {
+                    // Ưu tiên lấy từ currentPart, fallback mainPart
+                    OpenXmlPart? imgPartContainer = currentPart ?? mainPart;
+                    var part = imgPartContainer?.GetPartById(rId!);
+                    if (part is ImagePart imagePart)
+                    {
+                        using var s = imagePart.GetStream(FileMode.Open, FileAccess.Read);
+                        using var ms = new MemoryStream();
+                        s.CopyTo(ms);
+                        var base64 = Convert.ToBase64String(ms.ToArray());
+                        var mime = imagePart.ContentType; // ví dụ: image/png, image/jpeg
+
+                        // Render ảnh với style co giãn theo container, không vượt quá kích thước phần tử chứa.
+                        // Ghi kích thước gốc dưới dạng data-* để client có thể dùng khi cần.
+                        var style = "max-width:100%; max-height:100%; height:auto; width:auto; object-fit:contain;";
+                        sb.Append("<img class=\"w-drawing\" data-oxml=\"w:drawing\"");
+                        if (widthPx.HasValue) sb.Append($" data-natural-width=\"{widthPx.Value}\"");
+                        if (heightPx.HasValue) sb.Append($" data-natural-height=\"{heightPx.Value}\"");
+                        sb.Append($" style=\"{WebUtility.HtmlEncode(style)}\"");
+                        sb.Append(" src=\"");
+                        sb.Append($"data:{WebUtility.HtmlEncode(mime)};base64,{base64}\"");
+                        sb.Append(" alt=\"embedded-image\" />");
+                        return;
+                    }
+                }
+                catch { /* bỏ qua, dùng fallback */ }
+            }
+
+            // Fallback nếu không tìm thấy ảnh: ẩn phần tử (không render XML thô)
+            // Có thể thay bằng placeholder nếu muốn: sb.Append("<span class=\"w-drawing-missing\"></span>");
+        }
+
+        // Handler cho w:sym: cố gắng giải mã ký tự từ mã hex; riêng Wingdings 2 map về ô vuông rỗng
+        private void HandleSymbol(OpenXmlElement el, StringBuilder sb, MainDocumentPart _, OpenXmlPart __)
+        {
+            var sym = (W.SymbolChar)el;
+            var font = sym.Font?.Value;
+            var hex = sym.Char?.Value; // mã hex, thường là Unicode code point
+
+            // Mặc định: một ký tự ô vuông rỗng
+            int codePoint = 0x25A1; // □
+
+            // Nếu không phải Wingdings 2, thử giải mã mã hex để giữ đúng ký tự gốc
+            if (!string.IsNullOrEmpty(hex)
+                && int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+            {
+                codePoint = parsed;
+            }
+
+            // Nếu là Wingdings 2 (thường dùng làm checkbox), ép về ô vuông rỗng để hiển thị consistent
+            if (!string.IsNullOrEmpty(font) && font.Equals("Wingdings 2", StringComparison.OrdinalIgnoreCase))
+            {
+                codePoint = 0x25A1; // □
+            }
+
+            // Append đúng 1 ký tự
+            sb.Append(char.ConvertFromUtf32(codePoint));
+        }
+
+        private void IgnoreElement(OpenXmlElement el, StringBuilder sb, MainDocumentPart mainPart, OpenXmlPart currentPart)
+        {
+            // Không render gì cho các phần tử properties/trang trí
+        }
+
+        private void RenderNotesSection(StringBuilder sb, MainDocumentPart mainPart)
+        {
+            if (_footnoteQueue.Count > 0 && mainPart.FootnotesPart?.Footnotes != null)
+            {
+                sb.Append("<aside class=\"w-footnotes\"><ol>");
+                foreach (var id in _footnoteQueue.Distinct())
+                {
+                    var item = mainPart.FootnotesPart.Footnotes.Elements<W.Footnote>().FirstOrDefault(x => x.Id?.Value == id);
+                    sb.Append($"<li id=\"footnote-{id}\">");
+                    if (item != null) foreach (var c in item.ChildElements) ProcessElement(c, sb, mainPart, mainPart.FootnotesPart);
+                    sb.Append("</li>");
+                }
+                sb.Append("</ol></aside>");
+            }
+
+            if (_endnoteQueue.Count > 0 && mainPart.EndnotesPart?.Endnotes != null)
+            {
+                sb.Append("<aside class=\"w-endnotes\"><ol>");
+                foreach (var id in _endnoteQueue.Distinct())
+                {
+                    var item = mainPart.EndnotesPart.Endnotes.Elements<W.Endnote>().FirstOrDefault(x => x.Id?.Value == id);
+                    sb.Append($"<li id=\"endnote-{id}\">");
+                    if (item != null) foreach (var c in item.ChildElements) ProcessElement(c, sb, mainPart, mainPart.EndnotesPart);
+                    sb.Append("</li>");
+                }
+                sb.Append("</ol></aside>");
             }
         }
 
-        return string.Join("; ", styles);
-    }
-
-    /// <summary>
-    /// Highlights placeholders in the format <<placeholder>> with CSS class for visual distinction
-    /// </summary>
-    /// <param name="text">Text content to process</param>
-    /// <param name="isViewMode">True for view-only mode, false for mapping mode</param>
-    /// <returns>HTML content with highlighted placeholders</returns>
-    private static string HighlightPlaceholders(string text, bool isViewMode = false)
-    {
-        if (string.IsNullOrEmpty(text))
-            return "";
-
-        // Đối với chế độ chỉ xem, chúng ta không cần các span tương tác, chỉ cần hiển thị text.
-        if (isViewMode)
+        public string ConvertToHtml(byte[] docxBytes, bool isViewMode = false)
         {
-            return WebUtility.HtmlEncode(text);
-        }
-        
-        // Đối với chế độ mapping, tạo các span tương tác ở phía server theo đúng ý đồ thiết kế ban đầu.
-        // Điều này khắc phục lỗi placeholder không hiển thị đúng.
-        var placeholderRegex = new Regex(@"(<<[a-zA-Z0-9_]+>>)");
-        
-        // Tách chuỗi text bởi các placeholder, nhưng vẫn giữ lại các placeholder trong kết quả.
-        var parts = placeholderRegex.Split(text);
-        var sb = new StringBuilder();
+            if (docxBytes == null || docxBytes.Length == 0)
+                throw new ArgumentException("docxBytes không hợp lệ (null hoặc rỗng)", nameof(docxBytes));
 
-        foreach (var part in parts)
-        {
-            if (placeholderRegex.IsMatch(part))
+            using var ms = new MemoryStream(docxBytes, writable: false);
+            using var doc = WordprocessingDocument.Open(ms, false);
+            var mainPart = doc.MainDocumentPart ?? throw new InvalidOperationException("DOCX không có MainDocumentPart");
+            var sb = new StringBuilder();
+
+            // TODO: Sử dụng isViewMode để điều chỉnh render khi cần
+            sb.Append("<div class=\"docx-html\">");
+            foreach (var child in mainPart.Document.Body.ChildElements)
             {
-                // Phần này là một placeholder, ví dụ: "<<FieldName>>"
-                string fieldName = part.Trim('<', '>');
-                
-                // Tạo thẻ span cuối cùng. Nội dung của thẻ span là chính chuỗi placeholder,
-                // nhưng được mã hóa HTML để hiển thị chính xác và an toàn.
-                // Ví dụ: <span ...>&lt;&lt;FieldName&gt;&gt;</span>
-                sb.Append($"<span class=\"field-placeholder\" contenteditable=\"false\" data-field-name=\"{fieldName}\">{WebUtility.HtmlEncode(part)}</span>");
+                ProcessElement(child, sb, mainPart, mainPart);
             }
-            else
-            {
-                // Phần này là text thông thường, chỉ cần mã hóa HTML.
-                sb.Append(WebUtility.HtmlEncode(part));
-            }
-        }
-        return sb.ToString();
-    }
+            RenderNotesSection(sb, mainPart);
+            sb.Append("</div>");
 
-    /// <summary>
-    /// Decode special font characters (Wingdings, Symbol, etc.) to their Unicode equivalents
-    /// This maps font-specific character codes to proper HTML entities based on actual numbering.xml content
-    /// </summary>
-    private string DecodeSpecialFontCharacter(string? lvlText, string fontName, bool isViewMode)
-    {
-        if (string.IsNullOrEmpty(lvlText))
-            return "";
-
-        // Font character mapping for special fonts - based on actual Word font character codes
-        var fontCharacterMap = new Dictionary<string, Dictionary<string, string>>
-        {
-            ["Wingdings"] = new Dictionary<string, string>
-            {
-                // Common Wingdings bullet characters (hex codes from Word)
-                ["F0B7"] = isViewMode ? "-" : "&#9632;",  // ■ Black square
-                ["F0B8"] = isViewMode ? "-" : "&#9642;",  // ▪ Black small square
-                ["F06C"] = isViewMode ? "-" : "&#9679;",  // ● Black circle
-                ["F06D"] = isViewMode ? "-" : "&#9675;",  // ○ White circle
-                ["F0D8"] = isViewMode ? "-" : "&#9830;",  // ♦ Diamond
-                ["F0FC"] = isViewMode ? "-" : "&#9642;",  // ▪ Black small square
-                ["F0FE"] = isViewMode ? "-" : "&#9632;",  // ■ Black square
-                ["F0A7"] = isViewMode ? "-" : "&#9702;",  // ◦ White bullet
-                ["F0A8"] = isViewMode ? "-" : "&#9642;",  // ▪ Black small square
-                // Add more Wingdings mappings as needed
-            },
-            ["Wingdings 2"] = new Dictionary<string, string>
-            {
-                // Common Wingdings 2 bullet characters
-                ["F020"] = isViewMode ? "-" : "&#9632;",  // ■ Black square
-                ["F021"] = isViewMode ? "-" : "&#9642;",  // ▪ Black small square
-                ["F022"] = isViewMode ? "-" : "&#9679;",  // ● Black circle
-                ["F023"] = isViewMode ? "-" : "&#9675;",  // ○ White circle
-                ["F024"] = isViewMode ? "-" : "&#9830;",  // ♦ Diamond
-                ["F025"] = isViewMode ? "-" : "&#9642;",  // ▪ Black small square
-                ["2A"] = isViewMode ? "□" : "&#9633;",    // □ White square (Wingdings 2 code 42)
-                ["F02A"] = isViewMode ? "□" : "&#9633;",  // □ White square (alternative hex format)
-                // Add more Wingdings 2 mappings as needed
-            },
-            ["Symbol"] = new Dictionary<string, string>
-            {
-                // Common Symbol font bullet characters
-                ["F0B7"] = isViewMode ? "-" : "&#8226;",  // • Bullet
-                ["F0B8"] = isViewMode ? "-" : "&#8226;",  // • Bullet
-                ["F06C"] = isViewMode ? "-" : "&#9679;",  // ● Black circle
-                ["F06D"] = isViewMode ? "-" : "&#9675;",  // ○ White circle
-                ["F0D8"] = isViewMode ? "-" : "&#9830;",  // ♦ Diamond
-                ["F0FC"] = isViewMode ? "-" : "&#9642;",  // ▪ Black small square
-                ["F0FE"] = isViewMode ? "-" : "&#9632;",  // ■ Black square
-                // Add more Symbol mappings as needed
-            }
-        };
-
-        // Try to find exact font and character code match
-        if (fontCharacterMap.TryGetValue(fontName, out var characterMap))
-        {
-            if (characterMap.TryGetValue(lvlText.ToUpper(), out var unicodeChar))
-            {
-                return unicodeChar;
-            }
-        }
-
-        // If no exact match found, return empty string to use fallback
-        return "";
-    }
-
-    /// <summary>
-    /// Convert bullet text to safe HTML representation
-    /// </summary>
-    private string ConvertBulletToHtml(string bulletText, bool isViewMode)
-    {
-        if (string.IsNullOrEmpty(bulletText))
-            return isViewMode ? "-" : "&#8226;";
-
-        // Use existing IdentifyBulletSymbol method for consistent bullet handling
-        var (isBullet, bulletSymbol) = IdentifyBulletSymbol(bulletText, isViewMode);
-        if (isBullet)
-        {
-            return bulletSymbol;
-        }
-
-        // If not recognized as a bullet symbol, return as-is (could be custom text)
-        return bulletText;
-    }
-
-    // [SỬA ĐỔI] Thêm hàm helper để tính SHA256
-    private static string ComputeSha256Hash(string rawData)
-    {
-        if (string.IsNullOrEmpty(rawData))
-        {
-            return string.Empty;
-        }
-        
-        using (SHA256 sha256Hash = SHA256.Create())
-        {
-            byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
-            var builder = new StringBuilder();
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                builder.Append(bytes[i].ToString("x2"));
-            }
-            return builder.ToString();
+            return sb.ToString();
         }
     }
 }

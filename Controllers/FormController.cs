@@ -88,7 +88,10 @@ public sealed class FormController(
     public async Task<IActionResult> CreateStep1([FromForm] FormCreateVM vm)
     {
         if (!ModelState.IsValid)
+        {
+            LogInvalidModelState("CreateStep1 POST");
             return ValidationProblem(ModelState);
+        }
 
         try
         {
@@ -175,13 +178,18 @@ public sealed class FormController(
     {
         if (!ModelState.IsValid)
         {
+            // Ghi log chi tiết ModelState khi không hợp lệ
+            LogInvalidModelState("Create POST");
+
             TempData["ErrorMessage"] = "Dữ liệu chưa hợp lệ, vui lòng kiểm tra lại.";
             return RedirectToAction(nameof(Create));
         }
 
         try
         {
-            var id = await _formDataService.CreateAsync(vm);
+            // Chuẩn hóa FormValues về dictionary rỗng nếu null để tránh lỗi downstream
+            var normalizedVm = vm with { FormValues = vm.FormValues ?? new Dictionary<string, string?>() };
+            var id = await _formDataService.CreateAsync(normalizedVm);
             if (Request.Headers.XRequestedWith == "XMLHttpRequest")
             {
                 return Json(new { success = true, id });
@@ -409,6 +417,25 @@ public sealed class FormController(
             return Json(new { success = false, message = "ID không hợp lệ." });
         }
 
+        if (!ModelState.IsValid)
+        {
+            LogInvalidModelState($"Edit POST (FormDataID={id})");
+            var errorDetails = ModelState
+                .Where(ms => ms.Value is { Errors.Count: > 0 })
+                .Select(ms => new
+                {
+                    field = ms.Key,
+                    value = Request.HasFormContentType ? Request.Form[ms.Key].ToString() : null,
+                    errors = ms.Value!.Errors
+                        .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? e.Exception?.Message : e.ErrorMessage)
+                        .Where(m => !string.IsNullOrWhiteSpace(m))
+                        .ToArray()
+                })
+                .ToList();
+
+            return Json(new { success = false, message = "Dữ liệu không hợp lệ.", errors = errorDetails });
+        }
+
         try
         {
             await _formDataService.UpdateAsync(vm);
@@ -572,7 +599,7 @@ public sealed class FormController(
                 var docxBytes = await _templateStorageService.GetFileBytesAsync(relativeFilePath);
                 if (docxBytes != null)
                 {
-                    htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, _templateSettings.MaxTableNestingLevel, isViewMode: true);
+                    htmlContent = _docxToHtmlService.ConvertToHtml(docxBytes, isViewMode: true);
                     hasFile = true;
                 }
             }
@@ -599,8 +626,17 @@ public sealed class FormController(
             return baseHtml; // Trả về null hoặc empty nếu template không có file.
         }
 
-        // 2. Lấy dữ liệu đã lưu.
-        var savedData = JsonSerializer.Deserialize<Dictionary<string, string?>>(formData.FormDataJson ?? "{}", _jsonOptions) ?? new();
+        // 2. Lấy dữ liệu đã lưu (parse an toàn). Nếu JSON không hợp lệ, fallback về {} để tránh lỗi.
+        Dictionary<string, string?> savedData;
+        try
+        {
+            savedData = JsonSerializer.Deserialize<Dictionary<string, string?>>(formData.FormDataJson ?? "{}", _jsonOptions) ?? new();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "FormDataJson không hợp lệ cho FormDataID {FormDataId}. Fallback về rỗng", formData.FormDataID);
+            savedData = new();
+        }
         
         // 3. Lấy định nghĩa các trường để biết kiểu dữ liệu (phục vụ format).
         var fields = await _db.TemplateFields
@@ -659,6 +695,36 @@ public sealed class FormController(
 
             default:
                 return value;
+        }
+    }
+
+    /// <summary>
+    /// Ghi log chi tiết các lỗi ModelState hiện tại. Dùng chung cho các action POST.
+    /// </summary>
+    private void LogInvalidModelState(string actionName)
+    {
+        try
+        {
+            var errorDetails = ModelState
+                .Where(ms => ms.Value is { Errors.Count: > 0 })
+                .Select(ms => new
+                {
+                    Field = ms.Key,
+                    Value = Request.HasFormContentType ? Request.Form[ms.Key].ToString() : null,
+                    Errors = ms.Value!.Errors
+                        .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? e.Exception?.Message : e.ErrorMessage)
+                        .Where(m => !string.IsNullOrWhiteSpace(m))
+                        .ToArray()
+                })
+                .ToList();
+
+            _logger.LogWarning("ModelState không hợp lệ tại {Action}. Details: {ErrorDetails}",
+                actionName,
+                JsonSerializer.Serialize(errorDetails, _jsonOptions));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Không thể serialize chi tiết ModelState tại {Action}", actionName);
         }
     }
 }

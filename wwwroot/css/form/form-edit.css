@@ -3,32 +3,56 @@
 /* Tổ chức theo thứ tự: từ thẻ cha đến thẻ con, từ layout chính đến chi tiết */
 
 /* ========================================
-   1. LAYOUT CHÍNH - Main Layout Structure
+   1. LAYOUT CHÍNH - Main Layout Structure (Tỷ lệ 1:1)
    ======================================== */
 
-   .main-layout {
+/* Container chính cho layout 2 cột với tỷ lệ 1:1 */
+.main-layout {
     display: flex;
     width: 100%;
     gap: 1rem;
-    align-items: stretch;
+    align-items: stretch; /* Đảm bảo các panel có cùng chiều cao */
 }
 
-.main-layout.two-column > div {
-    flex: 1;
+/* Khắc phục tràn layout khung phải (preview pane) */
+#preview-pane-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* cho phép con thiết lập scroll */
+    overflow: hidden; /* cuộn sẽ ở .document-preview */
 }
+.document-preview {
+    flex: 1 1 auto;
+    overflow: auto; /* cho cuộn cả trục x/y nếu cần */
+    min-width: 0; /* tránh tràn ngang do nội dung dài */
+}
+#htmlPreviewContainer {
+    height: 100%;
+}
+
+/* Layout hai cột với tỷ lệ 1:1 */
+.main-layout.two-column > div {
+    flex: 1; /* mặc định: mỗi cột chiếm 50% */
+    min-width: 0; /* ngăn tràn ngang khi dùng flex (Chrome/Edge) */
+}
+/* Ưu tiên cho Form/Create: khung phải (preview) rộng hơn khung trái */
+.main-layout.two-column .form-input-area { flex: 0 0 45%; }
+.main-layout.two-column .preview-area    { flex: 1 1 55%; }
 
 /* ========================================
    2. CARD COMPONENTS - Thành phần Card
    ======================================== */
 
+/* Card container chung */
 .card {
     border: 1px solid #e5e7eb;
     display: flex;
     flex-direction: column;
-    height: 100%;
-    overflow: hidden;
+    height: 100%; /* Chiều cao đầy đủ của container */
+    overflow: hidden; /* Ngăn overflow ra ngoài card */
 }
 
+/* Card body - flexible content area */
 .card-body {
     display: flex;
     flex-direction: column;
@@ -41,33 +65,89 @@
    3. DOCUMENT PREVIEW - Vùng hiển thị tài liệu
    ======================================== */
 
+/* Container chính cho document preview với thanh cuộn */
 .document-preview {
     overflow-y: auto;
-    padding: 1rem;
+    padding: 0.5rem; /* giảm khoảng trống hai bên */
     flex-grow: 1;
+    /* Các thuộc tính giống Word */
     font-family: 'Times New Roman', Times, serif;
-    line-height: 1.15;
+    line-height: 1.15; /* Word default line-height */
     background: #fff;
     color: #000;
     border: none;
     outline: none;
+    /* Tab handling for better spacing */
     tab-size: 4;
     -moz-tab-size: 4;
 }
 
+/* Áp dụng font Times New Roman cho toàn bộ tài liệu HTML render */
 #html-preview, #html-preview * {
     font-family: "Times New Roman", Times, serif !important;
+}
+
+/* ========================================
+   3a. PREVIEW SIZE - Kích thước trang giống Mapping
+   ======================================== */
+/* Dùng kích thước trang A4 (210mm @96dpi ~ 794px) và canh giữa */
+.document-preview { --preview-zoom: 1; }
+#html-preview .docx-html {
+    width: 794px;
+    max-width: 100%;
+    margin: 0; /* căn trái, giảm khoảng trắng bên trái */
+    transform: none !important; /* bỏ zoom để hiển thị kích thước thực */
+    white-space: pre-wrap; /* giữ xuống dòng & khoảng trắng hợp lý */
+    tab-size: 4;
+    -moz-tab-size: 4;
+}
+
+/* Cho nội dung dài tự xuống dòng thay vì tràn/thu nhỏ */
+#html-preview p,
+#html-preview td,
+#html-preview th,
+#html-preview .w-r {
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: auto;
+}
+
+/* Đồng bộ bảng định dạng Word (w-tbl) giống Mapping để không tràn ngang) */
+#html-preview table.w-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #dee2e6;
+    margin: 0.5em 0;
+    background: #fff;
+    table-layout: fixed; /* giúp cột ổn định, bẻ dòng trong ô */
+}
+#html-preview table.w-tbl th,
+#html-preview table.w-tbl td {
+    border: 1px solid #e9ecef;
+    vertical-align: top;
+    padding: 2px 4px;
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: auto;
+}
+#html-preview table.w-tbl img,
+#html-preview .w-td img,
+#html-preview .w-tr img {
+    max-width: 100%;
+    height: auto;
 }
 
 /* ========================================
    4. DOCUMENT PAGE - Trang tài liệu
    ======================================== */
 
+/* Document page styling - rộng hơn, ít khoảng trắng */
 .document-page {
     background: #fff;
+    /*padding: 2rem;*/ /* Padding nhỏ hơn để tận dụng không gian */
     min-height: 100%;
-    width: 100%;
-    max-width: none;
+    width: 100%; /* Sử dụng toàn bộ chiều rộng có sẵn */
+    max-width: none; /* Bỏ giới hạn max-width */
     margin: 0;
     font-family: "Times New Roman", Times, serif;
     font-size: 12pt;
@@ -77,6 +157,7 @@
     box-sizing: border-box;
 }
 
+/* Border cho document page */
 .document-page::before {
     content: '';
     position: absolute;
@@ -92,45 +173,59 @@
    5. IMAGE HANDLING - Xử lý hình ảnh
    ======================================== */
 
+/* Image styling cơ bản để đảm bảo hiển thị đúng */
 .document-page img {
     display: inline-block !important;
     max-width: 100%;
     height: auto;
     vertical-align: top;
+    /* Ensure images are visible */
     opacity: 1 !important;
     visibility: visible !important;
 }
 
+/* Fix cho base64 images - fit trong container */
 img[src^="data:image"] {
     display: inline-block !important;
     opacity: 1 !important;
     visibility: visible !important;
+    /* Fit completely within container */
     width: 100% !important;
     height: auto !important;
     max-width: 100% !important;
     max-height: 100% !important;
+    /* Ensure proper scaling within container */
     object-fit: contain !important;
+    /* Minimal spacing */
     margin: 2px !important;
 }
 
+/* Xử lý đặc biệt cho logo images trong table cells */
 .document-page td img[src^="data:image"] {
+    /* Let image display at natural size but constrain to cell */
     width: auto !important;
     height: auto !important;
     max-width: 100% !important;
     max-height: none !important;
     object-fit: contain !important;
     margin: 2px !important;
+    /* Ensure image is always visible */
     display: block !important;
 }
 
+/* Fix paragraph chứa images - override excessive margin-right */
 .document-page td p:has(img[src^="data:image"]),
 .document-page p:has(img[src^="data:image"]) {
+    /* Override excessive margin-right from Word document */
     margin-right: 8pt !important;
+    /* Ensure paragraph doesn't push content out of view */
     max-width: 100% !important;
     overflow: visible !important;
 }
 
+/* Logo images trong paragraphs trong table cells */
 .document-page td p img[src^="data:image"] {
+    /* Force image to display with minimum size but allow scaling */
     width: auto !important;
     height: auto !important;
     min-width: 50px !important;
@@ -138,11 +233,14 @@ img[src^="data:image"] {
     margin: 2px !important;
     display: inline-block !important;
     vertical-align: top;
+    /* Force visibility */
     opacity: 1 !important;
     visibility: visible !important;
 }
 
+/* Logo images trong paragraphs (general) */
 .document-page p img[src^="data:image"] {
+    /* Fit within paragraph flow */
     width: auto !important;
     height: auto !important;
     max-width: 100% !important;
@@ -151,9 +249,10 @@ img[src^="data:image"] {
 }
 
 /* ========================================
-   6. TABLE STYLING - Styling bảng
+   6. TABLE STYLING - Styling bảng theo chuẩn Word
    ======================================== */
 
+/* Table styling để match Word */
 .document-page table {
     width: 100%;
     border-collapse: collapse;
@@ -161,12 +260,14 @@ img[src^="data:image"] {
     font-size: inherit;
 }
 
+/* Border cho table, th, td */
 .document-page table,
 .document-page th,
 .document-page td {
     border: 1px solid #000;
 }
 
+/* Cell padding và alignment */
 .document-page th,
 .document-page td {
     padding: 4pt 6pt;
@@ -175,11 +276,13 @@ img[src^="data:image"] {
     line-height: 1.15;
 }
 
+/* Header styling */
 .document-page th {
     background-color: transparent;
     font-weight: bold;
 }
 
+/* Nested table styling */
 .document-page table table {
     margin-bottom: 0;
 }
@@ -188,26 +291,37 @@ img[src^="data:image"] {
    7. TEXT CONTENT - Nội dung văn bản
    ======================================== */
 
+/* Paragraph spacing giống Word */
 .document-page p {
     margin: 0 0 12pt 0;
-    text-align: justify;
+    /* text-align: justify; */
 }
 
 /* ========================================
    8. FORM SPECIFIC - Các style đặc thù cho form
    ======================================== */
 
-.form-input-area,
+/* Style cho vùng nhập liệu */
+.form-input-area {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Style cho vùng preview */
 .preview-area {
     display: flex;
     flex-direction: column;
     height: 100%;
+    /* Cho phép co giãn đúng trong flex container */
+    min-width: 0;
 }
 
 /* ========================================
    9. RESPONSIVE DESIGN - Thiết kế responsive
    ======================================== */
 
+/* Responsive adjustments cho màn hình vừa */
 @media (max-width: 1200px) {
     .document-page {
         max-width: 100%;
@@ -216,6 +330,19 @@ img[src^="data:image"] {
     }
 }
 
+/* Responsive adjustments cho màn hình nhỏ */
+@media (max-width: 768px) {
+    .main-layout {
+        flex-direction: column;
+    }
+
+    .document-page {
+        padding: 24px 18px;
+        font-size: 11pt;
+    }
+}
+
+/* Responsive design - thu gọn khi màn hình nhỏ */
 @media (max-width: 992px) {
     .main-layout {
         flex-direction: column;
@@ -227,9 +354,121 @@ img[src^="data:image"] {
     }
 }
 
-@media (max-width: 768px) {
-    .document-page {
-        padding: 24px 18px;
-        font-size: 11pt;
-    }
+/* ========================================
+   6. PLACEHOLDER STYLES - Hiệu ứng placeholder động => đã có ở site.css
+   ======================================== */
+
+/* ========================================
+   10. NUMBERING/BULLETS (áp dụng cho #html-preview)
+   Đồng bộ với Template/Mapping để hiển thị bullet/numbering đúng
+   ======================================== */
+
+/* Căn trái dư chỗ cho marker, không ảnh hưởng text thực */
+#html-preview p.w-num {
+    position: relative;
+    padding-left: 2em;
+    text-indent: 0 !important;
+    margin: 0 0 0.4em 0;
+    min-height: 1em;
+}
+#html-preview p.w-num.w-lvl-1 { padding-left: 3.6em; }
+
+/* Riêng bullet, đảm bảo luôn có đủ chỗ cho marker hình vuông */
+#html-preview p.w-num.w-num-bullet { padding-left: 2.1em !important; }
+
+/* Pseudo marker cho numbering/bullet */
+#html-preview p.w-num::before {
+    position: absolute;
+    left: 0.1em;
+    width: 1.5em;
+    text-align: right;
+    white-space: pre;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 1em;
+    line-height: 1;
+    pointer-events: none;
+}
+
+/* Bullet: dùng trực tiếp lvlText nếu có (•, –, ◦...) */
+#html-preview p.w-num[data-num-fmt-lc="bullet"]::before {
+    content: attr(data-lvl-text) " \0020";
+}
+
+/* BULLET INLINE MODE (ngoài bảng): marker nằm cùng dòng với text */
+#html-preview p.w-num[data-num-fmt-lc="bullet"] {
+    padding-left: 0 !important;
+    white-space: normal;
+    margin-left: 0 !important;
+    text-indent: 0 !important;
+    display: block !important; /* vẫn là block để xuống dòng đúng */
+}
+#html-preview p.w-num.w-num-bullet {
+    padding-left: 0 !important;
+    white-space: normal;
+    margin-left: 0 !important;
+    text-indent: 0 !important;
+}
+#html-preview p.w-num.w-num-bullet::before {
+    position: static;
+    display: inline-block;
+    width: auto;
+    margin-right: 0.4em;
+    text-align: initial;
+    white-space: normal;
+    vertical-align: baseline;
+    content: attr(data-lvl-text) " \0020";
+}
+
+/* Fallback có mục tiêu: nếu data-lvl-text là '□' hoặc rỗng */
+#html-preview p.w-num[data-num-fmt-lc="bullet"][data-lvl-text="□"]::before { content: '□' " \0020"; }
+#html-preview p.w-num[data-num-fmt-lc="bullet"]:not([data-lvl-text])::before,
+#html-preview p.w-num[data-num-fmt-lc="bullet"][data-lvl-text=""]::before { content: '□' " \0020"; }
+
+/* Counters cho 2 cấp số: c0 (lvl0), c1 (lvl1) */
+#html-preview .docx-html { counter-reset: c0 c1; }
+
+/* Reset/increment theo data-start nếu có (bắt đầu lại danh sách) */
+#html-preview p.w-num.w-lvl-0[data-num-fmt-lc="decimal"][data-start] {
+    counter-reset: c0 calc(attr(data-start number) - 1), c1 0;
+}
+#html-preview p.w-num.w-lvl-1[data-num-fmt-lc="decimal"][data-start] {
+    counter-reset: c1 calc(attr(data-start number) - 1);
+}
+
+/* Tăng counter và hiển thị marker cho decimal */
+#html-preview p.w-num.w-lvl-0[data-num-fmt-lc="decimal"] { counter-increment: c0; }
+#html-preview p.w-num.w-lvl-0[data-num-fmt-lc="decimal"]::before { content: counter(c0) ".\0020"; }
+
+#html-preview p.w-num.w-lvl-1[data-num-fmt-lc="decimal"] { counter-increment: c1; }
+#html-preview p.w-num.w-lvl-1[data-num-fmt-lc="decimal"]::before { content: counter(c0) "." counter(c1) ".\0020"; }
+
+/* Align helpers (đồng bộ với mapping) */
+.w-align-center { text-align: center; }
+.w-align-right { text-align: right; }
+.w-align-justify { text-align: justify; }
+
+/* ========================================
+   11. MERGE PREVIEW MODAL - Tối ưu hiển thị trong modal
+   ======================================== */
+/* Modal gói gọn theo nội dung A4 (không cần full màn hình) */
+#mergePreviewModal .modal-dialog {
+    max-width: calc(794px + 2rem); /* A4 + padding hai bên */
+    width: auto;
+    margin: 1.75rem auto; /* canh giữa theo Bootstrap */
+}
+/* Thu gọn padding rỗng và cho phép cuộn theo chiều dọc nếu vượt viewport */
+#mergePreviewModal .modal-body {
+    padding: 0.5rem; /* vừa đủ ôm lấy trang A4 */
+    max-height: 84vh; /* tránh đè footer của modal */
+    overflow: auto;
+}
+/* Vùng preview trong modal: giữ padding tối thiểu */
+#mergePreviewModal .document-preview {
+    padding: 0.5rem;
+}
+/* Trang A4 trong modal: cố định 794px, canh giữa */
+#mergePreviewModal #html-preview .docx-html {
+    width: 794px;        /* kích thước A4 @96dpi */
+    max-width: 100%;     /* co lại nếu viewport nhỏ hơn */
+    margin: 0 auto;      /* canh giữa trong modal */
 }

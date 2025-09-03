@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- KHAI BÁO BIẾN VÀ DOM ELEMENTS ---
     const htmlPreview = document.getElementById('html-preview');
+    //const documentPreview = document.getElementById('document-preview');
+    const documentPreview = document.getElementById('html-preview');
     const dynamicFieldsContainer = document.getElementById('dynamicFieldsContainer');
     const btnReview = document.getElementById('btnReview');
     const btnDownload = document.getElementById('btnDownload');
@@ -42,10 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch(`${baseUrl}Form/GetMergedHtmlPreview/${formDataId}`);
                 const data = await res.json();
                 if (res.ok && data.success) {
-                    htmlPreview.innerHTML = data.htmlContent;
+                    if (documentPreview) {
+                        documentPreview.innerHTML = data.htmlContent;
+                    } else {
+                        htmlPreview.innerHTML = data.htmlContent;
+                    }
                 } else {
                     // Hiển thị lỗi nếu không lấy được preview
-                    htmlPreview.innerHTML = `<div class="alert alert-danger p-3">${data.message || 'Lỗi tải bản xem trước.'}</div>`;
+                    const target = documentPreview || htmlPreview;
+                    target.innerHTML = `<div class="alert alert-danger p-3">${data.message || 'Lỗi tải bản xem trước.'}</div>`;
                 }
             }
 
@@ -69,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const modalDownloadBtn = document.getElementById('modalDownloadBtn');
         const mergePreviewModal = new bootstrap.Modal(document.getElementById('mergePreviewModal'));
 
+        utils.setProcessingState(true, btnReview, { text: 'Đang xử lý...' });
         modalDownloadBtn.disabled = true;
         modalBody.innerHTML = '<div class="text-center p-5"><div class="spinner-border"></div><p class="mt-2">Đang xử lý...</p></div>';
         mergePreviewModal.show();
@@ -77,37 +85,51 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(`${baseUrl}Form/GetMergedHtmlPreview/${formDataId}`);
             const data = await res.json();
             if (res.ok && data.success) {
-                modalBody.innerHTML = `<div class="document-page">${data.htmlContent}</div>`;
+                modalBody.innerHTML = `
+                    <div class="document-preview">
+                        <div class="document-page" id="html-preview">
+                            <!--<div id="document-preview">-->
+                            ${data.htmlContent}
+                            <!--<</div>-->
+                        </div>
+                    </div>`;
                 modalDownloadBtn.disabled = false;
             } else {
                 throw new Error(data.message || 'Không thể tạo bản xem trước.');
             }
         } catch (error) {
             modalBody.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        } finally {
+            utils.setProcessingState(false, btnReview);
         }
     });
 
     // Sự kiện cho nút "Tải file (docx)"
     btnDownload.addEventListener('click', async (e) => {
         const button = e.currentTarget;
-        const originalHtml = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Đang xử lý...';
+        utils.setProcessingState(true, button, { text: 'Đang xử lý...' });
 
-        const blob = await utils.processMerge(formDataId, templateId);
-        if (blob) {
-            saveAs(blob, utils.generateFilename(formDataId));
+        try {
+            const blob = await utils.processMerge(formDataId, templateId);
+            if (blob) {
+                saveAs(blob, utils.generateFilename(formDataId));
+            }
+        } finally {
+            utils.setProcessingState(false, button);
         }
-
-        button.disabled = false;
-        button.innerHTML = originalHtml;
     });
 
     // Sự kiện cho nút tải về trong modal
-    document.getElementById('modalDownloadBtn').addEventListener('click', async () => {
-        const blob = await utils.processMerge(formDataId, templateId);
-        if (blob) {
-            saveAs(blob, utils.generateFilename(formDataId));
+    document.getElementById('modalDownloadBtn').addEventListener('click', async (e) => {
+        const button = e.currentTarget;
+        utils.setProcessingState(true, button, { text: 'Đang xử lý...' });
+        try {
+            const blob = await utils.processMerge(formDataId, templateId, false);
+            if (blob) {
+                saveAs(blob, utils.generateFilename(formDataId));
+            }
+        } finally {
+            utils.setProcessingState(false, button);
         }
     });
 

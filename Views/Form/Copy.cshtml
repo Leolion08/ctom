@@ -33,8 +33,11 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="TemplateId" value="@Model.TemplateId" />
 
-                    <div class="card-header py-2">
+                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
                         <h3 class="card-title mb-0">Nhập dữ liệu</h3>
+                        <button type="button" id="btnOpenCifSearch" class="btn btn-outline-primary btn-sm">
+                            <i class="ti ti-database-search me-1"></i> Tìm CIF
+                        </button>
                     </div>
                     <div class="card-body overflow-auto">
                         <!-- Thông tin chung -->
@@ -98,6 +101,32 @@
     </div>
 </div>
 
+<!-- Modal Tìm kiếm CIF -->
+<div class="modal fade" id="searchCifModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tìm kiếm thông tin CIF</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="cifSearchInput" class="form-label">Nhập số CIF</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="cifSearchInput" placeholder="Nhập số CIF...">
+                        <button class="btn btn-primary" type="button" id="btnSearchCif">
+                            <i class="ti ti-search me-1"></i> Tìm kiếm
+                        </button>
+                    </div>
+                </div>
+                <div id="cifSearchResult" class="mt-3">
+                    <!-- Kết quả tìm kiếm sẽ hiển thị ở đây -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal xác nhận (giữ nguyên) -->
 <div class="modal fade" id="customModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -133,11 +162,34 @@
 
     <!-- Truyền dữ liệu ban đầu -->
     <script>
-        window.initialFormData = @Html.Raw(Model.FormDataJson ?? "{}");
+        window.initialFormData = @Html.Raw(string.IsNullOrWhiteSpace(Model.FormDataJson) ? "{}" : Model.FormDataJson);
         window.templateId = @Model.TemplateId;
     </script>
 
     <!-- Sử dụng các file script đã nâng cấp -->
     <script src="~/js/form/form-common.js" asp-append-version="true"></script>
     <script src="~/js/form/form-copy.js" asp-append-version="true"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const utils = window.CTOM?.formUtils;
+            if (!utils) {
+                console.error('Không tìm thấy formUtils');
+                return;
+            }
+
+            // Khởi tạo modal tìm kiếm CIF
+            const cifSearchModal = utils.initCifSearchModal();
+            
+            // Mở modal khi nhấn nút Tìm CIF
+            const btnOpenCifSearch = document.getElementById('btnOpenCifSearch');
+            if (btnOpenCifSearch) {
+                btnOpenCifSearch.addEventListener('click', function() {
+                    if (cifSearchModal) {
+                        cifSearchModal.show();
+                    }
+                });
+            }
+        });
+    </script>
 }

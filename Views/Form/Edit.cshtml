@@ -30,8 +30,11 @@
                     <input type="hidden" asp-for="FormDataID" />
                     <input type="hidden" asp-for="TemplateId" />
 
-                    <div class="card-header py-2">
+                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
                         <h3 class="card-title mb-0">Nhập dữ liệu</h3>
+                        <button type="button" id="btnOpenCifSearch" class="btn btn-outline-primary btn-sm">
+                            <i class="ti ti-database-search me-1"></i> Tìm CIF
+                        </button>
                     </div>
                     <div class="card-body overflow-auto">
                         <!-- THÔNG TIN CHUNG -->
@@ -69,7 +72,7 @@
                             <i class="ti ti-eye me-2"></i>Tài liệu đã lưu
                         </button>
                         <button type="button" id="btnDownload" class="btn btn-success ms-2" data-form-id="@Model.FormDataID" data-template-id="@Model.TemplateId">
-                            <i class="ti ti-download me-2"></i>Tải file (docx)
+                            <i class="ti ti-download me-2"></i>Tải file
                         </button>
                     </div>
                 </form>
@@ -104,6 +107,31 @@
     </div>
 </div>
 
+<!-- Modal Tìm kiếm CIF -->
+<div class="modal modal-blur fade" id="searchCifModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tìm kiếm thông tin CIF</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="cifSearchInput" placeholder="Nhập số CIF...">
+                            <button class="btn btn-primary" type="button" id="btnSearchCif">
+                                <i class="ti ti-search me-1"></i> Tìm kiếm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="cifSearchResult"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Xem trước (giữ nguyên) -->
 <div class="modal modal-blur fade" id="mergePreviewModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -117,7 +145,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn me-auto" data-bs-dismiss="modal"><i class="ti ti-x me-2"></i>Đóng</button>
-                <button type="button" class="btn btn-success" id="modalDownloadBtn" disabled><i class="ti ti-download me-2"></i>Tải file (docx)</button>
+                <button type="button" class="btn btn-success" id="modalDownloadBtn" disabled><i class="ti ti-download me-2"></i>Tải file</button>
             </div>
         </div>
     </div>
@@ -158,10 +186,32 @@
 
     <!-- Pass initial data from Server to Client -->
     <script>
-        window.initialFormData = @Html.Raw(Model.FormDataJson ?? "{}");
+        window.initialFormData = @Html.Raw(string.IsNullOrWhiteSpace(Model.FormDataJson) ? "{}" : Model.FormDataJson);
     </script>
 
     <!-- THAY ĐỔI: Sử dụng file JS đã được nâng cấp -->
     <script src="~/js/form/form-common.js" asp-append-version="true"></script>
     <script src="~/js/form/form-edit.js" asp-append-version="true"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const utils = window.CTOM?.formUtils;
+            if (!utils) {
+                console.error('Không tìm thấy formUtils');
+                return;
+            }
+
+            // Khởi tạo modal tìm kiếm CIF
+            const cifSearchModal = utils.initCifSearchModal();
+            
+            // Mở modal khi nhấn nút Tìm CIF
+            const btnOpenCifSearch = document.getElementById('btnOpenCifSearch');
+            if (btnOpenCifSearch) {
+                btnOpenCifSearch.addEventListener('click', function() {
+                    if (cifSearchModal) {
+                        cifSearchModal.show();
+                    }
+                });
+            }
+        });
+    </script>
 }

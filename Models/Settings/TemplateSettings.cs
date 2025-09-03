@@ -32,6 +32,6 @@ namespace CTOM.Models.Settings
         /// 0 = chỉ bảng cha, 1 = bảng cha + bảng con lồng 1 cấp, 2 = cho phép lồng 2 cấp, v.v.
         /// Mặc định: 1 (cho phép bảng con lồng 1 cấp)
         /// </summary>
-        public int MaxTableNestingLevel { get; set; } = 1;
+        public int MaxTableNestingLevel { get; set; } = 1; //Không sử dụng
     }
 }

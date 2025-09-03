@@ -7,8 +7,12 @@
     var showStep2 = !showStep1; // Hiển thị bước 2 nếu đã chọn template
 }
 
-<!-- Thêm CSS chuẩn hóa -->
-<link rel="stylesheet" href="~/css/form/form-create.css" />
+@section Styles {
+    <!-- Dùng chung style với trang Mapping để giao diện đồng nhất -->
+    @* <link rel="stylesheet" href="~/css/template/mapping.css" /> *@
+    <!-- Giữ lại và ưu tiên style riêng của Form/Create (import sau để override nếu cần) -->
+    <link rel="stylesheet" href="~/css/form/form-create.css" />
+}
 
 <!-- Step indicator -->
 <ul class="steps steps-counter my-4" style="--tblr-step-icon-size:1.75rem;">
@@ -72,8 +76,11 @@
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="TemplateId" />
 
-                <div class="card-header py-2">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center">
                     <h3 class="card-title mb-0">Nhập dữ liệu</h3>
+                    <button type="button" id="btnOpenCifSearch" class="btn btn-outline-primary btn-sm">
+                        <i class="ti ti-database-search me-1"></i> Tìm CIF
+                    </button>
                 </div>
                 <div class="card-body overflow-auto">
                     <!-- THÔNG TIN CHUNG -->
@@ -139,21 +146,57 @@
                 <div class="card-body" id="preview-pane-body">
                     <div class="document-preview" id="htmlPreviewContainer">
                         <div class="document-page" id="html-preview">
-                            @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
-                            {
-                                @Html.Raw(Model.HtmlContent)
-                            }
-                            else
-                            {
-                                <div class="text-center p-5 text-muted">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-text"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" /></svg>
-                                    <p class="mt-2">Chưa có nội dung xem trước</p>
-                                </div>
-                            }
+                            <div id="document-preview">
+                                @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
+                                {
+                                    @Html.Raw(Model.HtmlContent)
+                                }
+                                else
+                                {
+                                    <div class="text-center p-5 text-muted">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-text"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" /></svg>
+                                        <p class="mt-2">Chưa có nội dung xem trước</p>
+                                    </div>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODAL TÌM KIẾM CIF                                                     -->
+<!-- ======================================================================= -->
+<div class="modal fade" id="searchCifModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tìm kiếm thông tin CIF</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="cifSearchInput" class="form-label">Nhập số CIF</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="cifSearchInput" placeholder="Nhập số CIF...">
+                        <button class="btn btn-primary" type="button" id="btnSearchCif">
+                            <i class="ti ti-search me-1"></i> Tìm kiếm
+                        </button>
+                    </div>
+                </div>
+                <div id="cifSearchResult" class="mt-3">
+                    <!-- Kết quả tìm kiếm sẽ hiển thị ở đây -->
+                </div>
+            </div>
+            @* <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary d-none" id="btnApplyCif">
+                    <i class="ti ti-check me-1"></i> Áp dụng
+                </button>
+            </div> *@
         </div>
     </div>
 </div>
@@ -220,4 +263,110 @@
     <!-- Custom scripts -->
     <script src="~/js/form/form-common.js"></script>
     <script src="~/js/form/form-create.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const utils = window.CTOM?.formUtils;
+            if (!utils) {
+                console.error('Không tìm thấy formUtils');
+                return;
+            }
+
+            // Khởi tạo modal tìm kiếm CIF
+            const cifSearchModal = utils.initCifSearchModal();
+            
+            // Mở modal khi nhấn nút Tìm CIF
+            const btnOpenCifSearch = document.getElementById('btnOpenCifSearch');
+            if (btnOpenCifSearch) {
+                btnOpenCifSearch.addEventListener('click', function() {
+                    if (cifSearchModal) {
+                        cifSearchModal.show();
+                    }
+                });
+            }
+        });
+    </script>
+    
+    @* <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const utils = window.CTOM?.formUtils;
+            if (!utils) {
+                console.error('Không tìm thấy formUtils');
+                return;
+            }
+
+            // Mở modal tìm kiếm CIF
+            const btnOpenCifSearch = document.getElementById('btnOpenCifSearch');
+            const searchCifModal = document.getElementById('searchCifModal');
+            const cifSearchInput = document.getElementById('cifSearchInput');
+            const btnSearchCif = document.getElementById('btnSearchCif');
+            const cifSearchResult = document.getElementById('cifSearchResult');
+            
+            if (!searchCifModal || !btnOpenCifSearch) return;
+            
+            const modal = new bootstrap.Modal(searchCifModal);
+            
+            // Mở modal khi nhấn nút Tìm CIF
+            btnOpenCifSearch.addEventListener('click', function() {
+                cifSearchInput.value = '';
+                cifSearchResult.innerHTML = '';
+                modal.show();
+            });
+            
+            // Xử lý tìm kiếm CIF
+            async function handleSearchCif() {
+                const cif = cifSearchInput.value.trim();
+                if (!cif) {
+                    await utils.showConfirmation({
+                        title: 'Thông báo',
+                        message: 'Vui lòng nhập số CIF cần tìm kiếm',
+                        showCancel: false,
+                        status: 'bg-warning',
+                        icon: 'ti ti-alert-triangle text-warning',
+                        confirmText: 'Đã hiểu'
+                    });
+                    return;
+                }
+                
+                try {
+                    // Gọi hàm searchAndApplyCif để xử lý tìm kiếm và áp dụng dữ liệu
+                    const success = await utils.searchAndApplyCif(cif);
+                    
+                    // Nếu tìm thấy và áp dụng thành công, đóng modal
+                    if (success) {
+                        modal.hide();
+                    }
+                } catch (error) {
+                    console.error('Lỗi khi tìm kiếm CIF:', error);
+                    // Lỗi đã được xử lý trong hàm searchAndApplyCif
+                }
+            }
+            
+            // Bắt sự kiện nhấn nút tìm kiếm
+            if (btnSearchCif) {
+                btnSearchCif.addEventListener('click', handleSearchCif);
+            }
+            
+            // Bắt sự kiện nhấn Enter trong ô tìm kiếm
+            if (cifSearchInput) {
+                cifSearchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearchCif();
+                    }
+                });
+            }
+            
+            // Đặt focus vào ô tìm kiếm khi mở modal
+            searchCifModal.addEventListener('shown.bs.modal', function() {
+                cifSearchInput.focus();
+            });
+            
+            // Reset modal khi đóng
+            searchCifModal.addEventListener('hidden.bs.modal', function() {
+                cifSearchInput.value = '';
+                cifSearchResult.innerHTML = '';
+            });
+        });
+    </script> *@
 }

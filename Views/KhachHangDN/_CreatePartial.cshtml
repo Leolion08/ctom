@@ -1,0 +1,301 @@
+@model CTOM.ViewModels.KhachHangDNViewModel
+
+<form id="khachHangForm" asp-action="Create" method="post" autocomplete="off" class="needs-validation" novalidate>
+    @Html.AntiForgeryToken()
+
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    @if (!ViewData.ModelState.IsValid && ViewData.ModelState.TryGetValue(string.Empty, out var modelStateEntry) && modelStateEntry.Errors.Count > 0)
+    {
+        <div class="alert alert-danger alert-important mb-3" role="alert">
+            <h4 class="alert-title">Vui lòng sửa các lỗi sau:</h4>
+            <ul>
+                @foreach (var error in modelStateEntry.Errors)
+                {
+                    <li>@error.ErrorMessage</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
+    {
+        <div class="alert alert-danger">
+            @ViewBag.ErrorMessage
+        </div>
+    }
+
+    <ul class="nav nav-tabs mb-3" id="khachHangTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab" aria-controls="basic" aria-selected="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-info-circle me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
+                    <path d="M12 9h.01" />
+                    <path d="M11 12h1v4h1" />
+                </svg>
+                Thông tin cơ bản
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="legal-rep-tab" data-bs-toggle="tab" data-bs-target="#legal-rep" type="button" role="tab" aria-controls="legal-rep">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-check me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+                    <path d="M6 21v-2a4 4 0 0 1 4 -4h4" />
+                    <path d="M15 19l2 2l4 -4" />
+                </svg>
+                Người đại diện
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="accountant-tab" data-bs-toggle="tab" data-bs-target="#accountant" type="button" role="tab" aria-controls="accountant">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calculator me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M4 3m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+                    <path d="M8 7m0 1a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1z" />
+                    <path d="M8 12l0 .01" />
+                    <path d="M12 12l0 .01" />
+                    <path d="M16 12l0 .01" />
+                    <path d="M8 16l0 .01" />
+                    <path d="M12 16l0 .01" />
+                    <path d="M16 16l0 .01" />
+                </svg>
+                Kế toán trưởng
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content p-4 border border-top-0 rounded-bottom bg-white" id="khachHangTabsContent">
+        <div class="tab-pane fade show active" id="basic" role="tabpanel" aria-labelledby="basic-tab">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="SoCif" class="form-label required"></label>
+                    <input asp-for="SoCif" class="form-control" />
+                    <span asp-validation-for="SoCif" class="text-danger"></span>
+                </div>
+                <div class="col-md-8">
+                    <label asp-for="TenCif" class="form-label required"></label>
+                    <input asp-for="TenCif" class="form-control" />
+                    <span asp-validation-for="TenCif" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="TenTiengAnh" class="form-label"></label>
+                    <input asp-for="TenTiengAnh" class="form-control" />
+                    <span asp-validation-for="TenTiengAnh" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="LinhVucKinhDoanhChinh" class="form-label"></label>
+                    <input asp-for="LinhVucKinhDoanhChinh" class="form-control" />
+                    <span asp-validation-for="LinhVucKinhDoanhChinh" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="LoaiHinhDN" class="form-label"></label>
+                    <input asp-for="LoaiHinhDN" class="form-control" />
+                    <span asp-validation-for="LoaiHinhDN" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SoGiayChungNhanDKKD" class="form-label"></label>
+                    <input asp-for="SoGiayChungNhanDKKD" class="form-control" />
+                    <span asp-validation-for="SoGiayChungNhanDKKD" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="NgayCapGiayChungNhanDKKD" class="form-label"></label>
+                    <input asp-for="NgayCapGiayChungNhanDKKD" type="text" class="form-control" data-bs-toggle="datepicker" placeholder="dd/MM/yyyy" autocomplete="off" />
+                    <span asp-validation-for="NgayCapGiayChungNhanDKKD" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="NoiCapGiayChungNhanDKKD" class="form-label"></label>
+                    <input asp-for="NoiCapGiayChungNhanDKKD" class="form-control" />
+                    <span asp-validation-for="NoiCapGiayChungNhanDKKD" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="DiaChiTrenDKKD" class="form-label"></label>
+                    <textarea asp-for="DiaChiTrenDKKD" class="form-control" rows="2" placeholder="Địa chỉ đăng ký kinh doanh"></textarea>
+                    <span asp-validation-for="DiaChiTrenDKKD" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="DiaChiKinhDoanhHienTai" class="form-label"></label>
+                    <textarea asp-for="DiaChiKinhDoanhHienTai" class="form-control" rows="2" placeholder="Địa chỉ kinh doanh hiện tại"></textarea>
+                    <span asp-validation-for="DiaChiKinhDoanhHienTai" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="SoDienThoaiDN" class="form-label"></label>
+                    <input asp-for="SoDienThoaiDN" class="form-control" placeholder="024 3823 4567" />
+                    <span asp-validation-for="SoDienThoaiDN" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="SoFaxCongTy" class="form-label"></label>
+                    <input asp-for="SoFaxCongTy" class="form-control" placeholder="024 3823 4568" />
+                    <span asp-validation-for="SoFaxCongTy" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="EmailCongTy" class="form-label"></label>
+                    <input asp-for="EmailCongTy" type="email" class="form-control" placeholder="contact@company.com" />
+                    <span asp-validation-for="EmailCongTy" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="XepHangTinDungNoiBo" class="form-label"></label>
+                    <input asp-for="XepHangTinDungNoiBo" class="form-control" />
+                    <span asp-validation-for="XepHangTinDungNoiBo" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="legal-rep" role="tabpanel" aria-labelledby="legal-rep-tab">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="TenNguoiDaiDienTheoPhapLuat" class="form-label"></label>
+                    <input asp-for="TenNguoiDaiDienTheoPhapLuat" class="form-control" placeholder="Họ và tên người đại diện" />
+                    <span asp-validation-for="TenNguoiDaiDienTheoPhapLuat" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ChucVu" class="form-label"></label>
+                    <input asp-for="ChucVu" class="form-control" placeholder="Giám đốc, Tổng giám đốc" />
+                    <span asp-validation-for="ChucVu" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="VanBanUyQuyenSo" class="form-label"></label>
+                    <input asp-for="VanBanUyQuyenSo" class="form-control" placeholder="Số văn bản ủy quyền" />
+                    <span asp-validation-for="VanBanUyQuyenSo" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="NgaySinhDaiDienCongTy" class="form-label"></label>
+                    <input asp-for="NgaySinhDaiDienCongTy" type="text" class="form-control" data-bs-toggle="datepicker" placeholder="dd/MM/yyyy" autocomplete="off" />
+                    <span asp-validation-for="NgaySinhDaiDienCongTy" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="GioiTinhDaiDienCongTy" class="form-label"></label>
+                    <select asp-for="GioiTinhDaiDienCongTy" class="form-select">
+                        <option value="">-- Chọn giới tính --</option>
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                        <option value="Khác">Khác</option>
+                    </select>
+                    <span asp-validation-for="GioiTinhDaiDienCongTy" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="QuocTichDaiDienCongTy" class="form-label"></label>
+                    <input asp-for="QuocTichDaiDienCongTy" class="form-control" value="Việt Nam" />
+                    <span asp-validation-for="QuocTichDaiDienCongTy" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="SoGiayToTuyThanDaiDienCongTy" class="form-label"></label>
+                    <input asp-for="SoGiayToTuyThanDaiDienCongTy" class="form-control" placeholder="Số CMND/CCCD/Hộ chiếu" />
+                    <span asp-validation-for="SoGiayToTuyThanDaiDienCongTy" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="NgayCapGiayToTuyThanDaiDienDN" class="form-label"></label>
+                    <input asp-for="NgayCapGiayToTuyThanDaiDienDN" type="text" class="form-control" data-bs-toggle="datepicker" placeholder="dd/MM/yyyy" autocomplete="off" />
+                    <span asp-validation-for="NgayCapGiayToTuyThanDaiDienDN" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="NgayHetHanGiayToTuyThanDaiDienDN" class="form-label"></label>
+                    <input asp-for="NgayHetHanGiayToTuyThanDaiDienDN" type="text" class="form-control" data-bs-toggle="datepicker" placeholder="dd/MM/yyyy" autocomplete="off" />
+                    <span asp-validation-for="NgayHetHanGiayToTuyThanDaiDienDN" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="NoiCapGiayToTuyThanDaiDienDN" class="form-label"></label>
+                    <input asp-for="NoiCapGiayToTuyThanDaiDienDN" class="form-control" />
+                    <span asp-validation-for="NoiCapGiayToTuyThanDaiDienDN" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SoDienThoaiDaiDienCongTy" class="form-label"></label>
+                    <input asp-for="SoDienThoaiDaiDienCongTy" class="form-control" placeholder="0912 345 678" />
+                    <span asp-validation-for="SoDienThoaiDaiDienCongTy" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="EmailDaiDienCongTy" class="form-label"></label>
+                    <input asp-for="EmailDaiDienCongTy" type="email" class="form-control" placeholder="email@example.com" />
+                    <span asp-validation-for="EmailDaiDienCongTy" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="DiaChiDaiDienCongTy" class="form-label"></label>
+                    <textarea asp-for="DiaChiDaiDienCongTy" class="form-control" rows="2" placeholder="Địa chỉ liên hệ"></textarea>
+                    <span asp-validation-for="DiaChiDaiDienCongTy" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="accountant" role="tabpanel" aria-labelledby="accountant-tab">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="TenKeToanTruong" class="form-label"></label>
+                    <input asp-for="TenKeToanTruong" class="form-control" placeholder="Họ và tên kế toán trưởng" />
+                    <span asp-validation-for="TenKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ChucVuKeToanTruong" class="form-label"></label>
+                    <input asp-for="ChucVuKeToanTruong" class="form-control" placeholder="Chức vụ kế toán trưởng" />
+                    <span asp-validation-for="ChucVuKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="NgaySinhKeToanTruong" class="form-label"></label>
+                    <input asp-for="NgaySinhKeToanTruong" type="text" class="form-control" data-bs-toggle="datepicker" placeholder="dd/MM/yyyy" autocomplete="off" />
+                    <span asp-validation-for="NgaySinhKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="GioiTinhKeToanTruong" class="form-label"></label>
+                    <select asp-for="GioiTinhKeToanTruong" class="form-select">
+                        <option value="">-- Chọn giới tính --</option>
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                        <option value="Khác">Khác</option>
+                    </select>
+                    <span asp-validation-for="GioiTinhKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="QuocTichKeToanTruong" class="form-label"></label>
+                    <input asp-for="QuocTichKeToanTruong" class="form-control" value="Việt Nam" />
+                    <span asp-validation-for="QuocTichKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SoGiayToTuyThanKeToanTruong" class="form-label"></label>
+                    <input asp-for="SoGiayToTuyThanKeToanTruong" class="form-control" placeholder="Số CMND/CCCD/Hộ chiếu" />
+                    <span asp-validation-for="SoGiayToTuyThanKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="NgayCapGiayToTuyThanKeToanTruong" class="form-label"></label>
+                    <input asp-for="NgayCapGiayToTuyThanKeToanTruong" type="text" class="form-control" data-bs-toggle="datepicker" placeholder="dd/MM/yyyy" autocomplete="off" />
+                    <span asp-validation-for="NgayCapGiayToTuyThanKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="NoiCapGiayToTuyThanKeToanTruong" class="form-label"></label>
+                    <input asp-for="NoiCapGiayToTuyThanKeToanTruong" class="form-control" />
+                    <span asp-validation-for="NoiCapGiayToTuyThanKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="NgayHetHanGiayToTuyThanKeToanTruong" class="form-label"></label>
+                    <input asp-for="NgayHetHanGiayToTuyThanKeToanTruong" type="text" class="form-control" data-bs-toggle="datepicker" placeholder="dd/MM/yyyy" autocomplete="off" />
+                    <span asp-validation-for="NgayHetHanGiayToTuyThanKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SoDienThoaiKeToanTruong" class="form-label"></label>
+                    <input asp-for="SoDienThoaiKeToanTruong" class="form-control" placeholder="0912 345 678" />
+                    <span asp-validation-for="SoDienThoaiKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="EmailKeToanTruong" class="form-label"></label>
+                    <input asp-for="EmailKeToanTruong" type="email" class="form-control" placeholder="email@example.com" />
+                    <span asp-validation-for="EmailKeToanTruong" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="DiaChiKeToanTruong" class="form-label"></label>
+                    <textarea asp-for="DiaChiKeToanTruong" class="form-control" rows="2" placeholder="Địa chỉ liên hệ"></textarea>
+                    <span asp-validation-for="DiaChiKeToanTruong" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end mt-4">
+        <button type="submit" id="saveBtn" class="btn btn-primary">
+            <i class="ti ti-device-floppy me-1"></i>
+            Lưu thông tin
+        </button>
+        <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">
+            <i class="ti ti-x me-1"></i>
+            Hủy
+        </button>
+    </div>
+</form>

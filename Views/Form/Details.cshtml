@@ -3,7 +3,7 @@
     ViewData["Title"] = "Chi tiết giao dịch";
 }
 
-<!-- Link tới file CSS mới -->
+<!-- CSS riêng cho trang Details -->
 <link rel="stylesheet" href="~/css/form/form-details.css" asp-append-version="true" />
 
 <div class="page-header d-print-none">
@@ -72,7 +72,7 @@
                             <i class="ti ti-eye me-2"></i>Tài liệu đã lưu
                         </button>
                         <button id="btnDownload" type="button" class="btn btn-success" data-form-id="@Model.FormDataID" data-template-id="@Model.TemplateId">
-                            <i class="ti ti-download me-2"></i>Tải file (docx)
+                            <i class="ti ti-download me-2"></i>Tải file
                         </button>
                     </div>
                 </div>
@@ -86,16 +86,18 @@
                     <div class="card-body" id="preview-pane-body">
                         <div class="document-preview" id="htmlPreviewContainer">
                             <div class="document-page" id="html-preview">
-                                @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
-                                {
-                                    @Html.Raw(Model.HtmlContent)
-                                }
-                                else
-                                {
-                                    <div class="text-center p-5 text-muted">
-                                        <p class="mt-2">Không có nội dung xem trước cho template này.</p>
-                                    </div>
-                                }
+                                @* <div id="document-preview"> *@
+                                    @if (Model.HasFile && !string.IsNullOrEmpty(Model.HtmlContent))
+                                    {
+                                        @Html.Raw(Model.HtmlContent)
+                                    }
+                                    else
+                                    {
+                                        <div class="text-center p-5 text-muted">
+                                            <p class="mt-2">Không có nội dung xem trước cho template này.</p>
+                                        </div>
+                                    }
+                                @* </div> *@
                             </div>
                         </div>
                     </div>
@@ -118,7 +120,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn me-auto" data-bs-dismiss="modal"><i class="ti ti-x me-2"></i>Đóng</button>
-                <button type="button" class="btn btn-success" id="modalDownloadBtn" disabled><i class="ti ti-download me-2"></i>Tải file (docx)</button>
+                <button type="button" class="btn btn-success" id="modalDownloadBtn" disabled><i class="ti ti-download me-2"></i>Tải file</button>
             </div>
         </div>
     </div>
@@ -166,7 +168,7 @@
 
     <!-- Truyền dữ liệu ban đầu -->
     <script>
-        window.initialFormData = @Html.Raw(Model.FormDataJson ?? "{}");
+        window.initialFormData = @Html.Raw(string.IsNullOrWhiteSpace(Model.FormDataJson) ? "{}" : Model.FormDataJson);
     </script>
 
     <!-- Sử dụng các file script đã nâng cấp -->

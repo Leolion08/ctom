@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dữ liệu ban đầu được truyền từ server qua thẻ script trong Edit.cshtml
     let initialFormData = window.initialFormData || {};
 
+    // Sử dụng utils.setProcessingState từ form-common.js cho trạng thái nút
+
     /**
      * SỬA LỖI: Cấu trúc lại hàm khởi tạo để giải quyết race condition.
      */
@@ -114,8 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!userConfirmed) return;
 
-        btnSave.disabled = true;
-        btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
+        utils.setProcessingState(true, btnSave, { text: 'Đang lưu...' });
 
         const formData = new FormData(editForm);
         // Logic chuyển đổi ngày tháng trước khi gửi vẫn giữ nguyên
@@ -156,8 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             await utils.showConfirmation({ title: 'Lỗi', message: error.message, showCancel: false, status: 'bg-danger', icon: 'ti ti-x', confirmText: 'Đã hiểu' });
         } finally {
-            btnSave.disabled = false;
-            btnSave.innerHTML = '<i class="ti ti-device-floppy me-2"></i>Lưu';
+            utils.setProcessingState(false, btnSave);
         }
     });
 
@@ -172,6 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const mergePreviewModal = new bootstrap.Modal(document.getElementById('mergePreviewModal'));
 
         // Hiển thị trạng thái đang tải
+        utils.setProcessingState(true, btnReview, { text: 'Đang xử lý...' });
         modalDownloadBtn.disabled = true;
         modalBody.innerHTML = '<div class="text-center p-5"><div class="spinner-border"></div><p class="mt-2">Đang xử lý...</p></div>';
         mergePreviewModal.show();
@@ -182,9 +183,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
 
             if (res.ok && data.success) {
-                // Hiển thị HTML đã được trộn và highlight sẵn từ server vào trong modal.
-                // Class 'document-page' được thêm vào để đảm bảo style đồng nhất.
-                modalBody.innerHTML = `<div class="document-page">${data.htmlContent}</div>`;
+                // Hiển thị HTML đã được trộn trong cấu trúc wrapper giống vùng preview chính
+                // để toàn bộ CSS ở form-edit.css áp dụng đồng nhất (document-preview -> #html-preview.document-page -> #document-preview)
+                modalBody.innerHTML = `
+                    <div class="document-preview">
+                        <div class="document-page" id="html-preview">
+                            <!--<div id="document-preview">-->
+                            ${data.htmlContent}
+                            <!--<</div>-->
+                        </div>
+                    </div>`;
                 modalDownloadBtn.disabled = false; // Bật nút tải về
             } else {
                 // Ném lỗi nếu API trả về thất bại
@@ -193,28 +201,36 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             // Hiển thị thông báo lỗi nếu có vấn đề xảy ra
             modalBody.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        } finally {
+            utils.setProcessingState(false, btnReview);
         }
     });
 
     btnDownload.addEventListener('click', async (e) => {
         const button = e.currentTarget;
-        const originalHtml = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Đang xử lý...';
+        utils.setProcessingState(true, button, { text: 'Đang xử lý...' });
 
-        const blob = await utils.processMerge(formDataId, templateId, false);
-        if (blob) {
-            saveAs(blob, utils.generateFilename(formDataId));
+        try {
+            const blob = await utils.processMerge(formDataId, templateId, false);
+            if (blob) {
+                saveAs(blob, utils.generateFilename(formDataId));
+            }
+        } finally {
+            utils.setProcessingState(false, button);
         }
-
-        button.disabled = false;
-        button.innerHTML = originalHtml;
     });
 
-    document.getElementById('modalDownloadBtn').addEventListener('click', async () => {
-        const blob = await utils.processMerge(formDataId, templateId, false);
-        if (blob) {
-            saveAs(blob, utils.generateFilename(formDataId));
+    document.getElementById('modalDownloadBtn').addEventListener('click', async (e) => {
+        const button = e.currentTarget;
+        utils.setProcessingState(true, button, { text: 'Đang xử lý...' });
+
+        try {
+            const blob = await utils.processMerge(formDataId, templateId, false);
+            if (blob) {
+                saveAs(blob, utils.generateFilename(formDataId));
+            }
+        } finally {
+            utils.setProcessingState(false, button);
         }
     });
 

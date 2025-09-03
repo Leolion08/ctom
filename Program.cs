@@ -157,9 +157,10 @@ builder.Services.AddScoped<ITemplateStorageService, TemplateStorageService>();
 builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
 builder.Services.AddScoped<IFormDataService, FormDataService>();
 builder.Services.AddScoped<ExcelImportService>();
-builder.Services.AddScoped<HtmlToDocxService>();
+//builder.Services.AddScoped<HtmlToDocxService>(); //Khong su dung
 //builder.Services.AddScoped<DocxPlaceholderMappingService>();
 builder.Services.AddScoped<DocxToStructuredHtmlService>();
+builder.Services.AddScoped<DocxPlaceholderInsertionService>();
 // Register custom claims factory so MaPhong & TenUser are always present
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, AppClaimsPrincipalFactory>();
 builder.Services.AddScoped<DataSeeder>(); // Đăng ký DataSeeder

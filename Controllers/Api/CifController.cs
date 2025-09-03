@@ -32,14 +32,9 @@ public sealed class CifController(ApplicationDbContext db) : Controller
             .FirstOrDefaultAsync(x => x.SoCif == cif);
 
         if (customer is null){
-            return Json(ApiResponse.NotExisted("Không tìm thấy CIF"));
+            return Json(ApiResponse.NotExisted($"Không tìm thấy CIF {cif} trong kho dữ liệu."));
         } else {
             return Json(ApiResponse<KhachHangDN>.Existed($"Kho dữ liệu có tồn tại CIF {cif}", customer));
         }
-
-        // if (customer is null)
-        //     return NotFound(ApiResponse.Fail("Không tìm thấy CIF"));
-
-        // return Ok(ApiResponse<KhachHangDN>.Ok(customer));
     }
 }

@@ -150,7 +150,67 @@ namespace CTOM.Data
             }
 
             var dbSet = _context.Set<TEntity>();
+
+            // Nếu bảng đã có dữ liệu thì bỏ qua seeding
+            if (await dbSet.AsNoTracking().AnyAsync())
+            {
+                _logger.LogInformation("Bảng {TableName} đã có dữ liệu. Bỏ qua seeding từ {FileName}.", typeof(TEntity).Name, fileName);
+                return;
+            }
+
             var primaryKeyProperty = _context.Model.FindEntityType(typeof(TEntity))!.FindPrimaryKey()!.Properties.First();
+
+            // Xử lý đặc thù cho BusinessOperation: tránh trùng unique index (OperationName, ParentOperationID, CustomerType)
+            if (typeof(TEntity) == typeof(BusinessOperation))
+            {
+                var jsonBos = entitiesInJson.Cast<BusinessOperation>().ToList();
+
+                // Tập khóa duy nhất đã tồn tại trong DB
+                var existingKeys = await _context.BusinessOperations
+                    .Select(e => new
+                    {
+                        Name = e.OperationName,
+                        ParentId = e.ParentOperationID,
+                        CustType = e.CustomerType
+                    })
+                    .ToListAsync();
+
+                var existingKeySet = existingKeys
+                    .Select(k => (
+                        Name: (k.Name ?? string.Empty).Trim(),
+                        ParentId: k.ParentId, // int? giữ nguyên null để khớp chính xác
+                        CustType: (k.CustType ?? "DN").Trim()
+                    ))
+                    .ToHashSet();
+
+                var toAdd = new List<BusinessOperation>();
+                foreach (var bo in jsonBos)
+                {
+                    var key = (
+                        Name: (bo.OperationName ?? string.Empty).Trim(),
+                        ParentId: bo.ParentOperationID, // int? giữ nguyên null
+                        CustType: (bo.CustomerType ?? "DN").Trim()
+                    );
+
+                    if (!existingKeySet.Contains(key))
+                    {
+                        toAdd.Add(bo);
+                    }
+                }
+
+                if (toAdd.Any())
+                {
+                    await _context.BusinessOperations.AddRangeAsync(toAdd);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Đã seed {Count} bản ghi mới vào bảng {TableName}.", toAdd.Count, nameof(BusinessOperation));
+                }
+                else
+                {
+                    _logger.LogInformation("Bảng {TableName} đã có đầy đủ dữ liệu từ file seed. Không có gì để thêm mới.", nameof(BusinessOperation));
+                }
+
+                return; // Kết thúc nhánh đặc thù
+            }
 
             var existingEntities = await dbSet.ToListAsync();
             var entitiesToAdd = new List<TEntity>();

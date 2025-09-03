@@ -8,5 +8,5 @@ namespace CTOM.ViewModels.Form;
 public sealed record FormCreateStep2VM(
     int TemplateId,
     string? Note,
-    Dictionary<string, string?> FormValues
+    Dictionary<string, string?>? FormValues
 );

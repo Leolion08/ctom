@@ -45,8 +45,6 @@ public class TemplateDetailsVM
     /// </summary>
     public bool HasFile { get; init; }
 
-    public string MappedFieldsJson { get; set; } = "[]"; //Thông tin mapping của các field
-
     // ---------- Thông tin tạo / sửa ----------
     [Display(Name = "Người tạo")]
     public string? CreatedByUserName { get; init; }

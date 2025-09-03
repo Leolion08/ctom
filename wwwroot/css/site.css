@@ -213,7 +213,7 @@ label {
     font-size: inherit !important;
     font-weight: inherit !important;
     font-style: inherit !important;
-    color: inherit !important;
+    /*color: inherit !important;*/
     line-height: inherit !important;
 }
 
