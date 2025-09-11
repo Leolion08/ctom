@@ -1,4 +1,4 @@
-﻿@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Identity
 @using CTOM.Models.Entities
 
 @inject SignInManager<ApplicationUser> SignInManager /* Phải là ApplicationUser */
@@ -8,20 +8,29 @@
 
 @if (SignInManager.IsSignedIn(User))
 {
-
-    <li class="nav-item">
-        @* <a  class="nav-link" asp-area="Identity" asp-page="/Account/Manage/Index" title="Manage"> Xin chào @User.Identity?.Name!</a> *@
-        <span class="nav-link"> Xin chào @User.Identity?.Name!</span>
+    <li class="nav-item d-flex align-items-center">
+        <span class="nav-link text-muted">Xin chào, @User.Identity?.Name</span>
     </li>
     <li class="nav-item">
-        @* <form  class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })"> *@
-        <form  class="form-inline" 
-        asp-area="Identity" 
-        asp-page="/Account/Logout" 
-        asp-route-returnUrl="@Url.Page("/Account/Login", new { area = "Identity" })"
-        method="post">
-            <button  type="submit" class="nav-link">Thoát &nbsp;
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-logout"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2" /><path d="M9 12h12l-3 -3" /><path d="M18 15l3 -3" /></svg>
+        <a class="nav-link" asp-area="Identity" asp-page="/Account/Manage/ChangePassword" title="Đổi mật khẩu">
+            <svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-edit"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" /><path d="M16 5l3 3" /></svg>
+            Đổi mật khẩu
+        </a>
+    </li>
+    <li class="nav-item">
+        <form class="form-inline" 
+              asp-area="Identity" 
+              asp-page="/Account/Logout" 
+              asp-route-returnUrl="@Url.Page("/Account/Login", new { area = "Identity" })"
+              method="post">
+            <button type="submit" class="nav-link">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-logout me-1" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2" />
+                    <path d="M9 12h12l-3 -3" />
+                    <path d="M18 15l3 -3" />
+                </svg>
+                Thoát
             </button>
         </form>
     </li>

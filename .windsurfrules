@@ -1,0 +1,7 @@
+# Documentation Rules
+- Luôn viết tiếng Việt, rõ ràng.
+- CHỈ tạo/tự động cập nhật file trong thư mục `docs/`.
+- Dùng Mermaid cho sơ đồ: C4 (context/container), sequence, class/ER.
+- Khi suy luận từ code, trích dẫn đường dẫn + dòng (link tương đối).
+- Không thay đổi code sản phẩm.
+- Nếu không chắc, thêm mục "Giả định" + "Khoảng trống cần xác minh".

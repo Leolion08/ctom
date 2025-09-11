@@ -1,0 +1,11 @@
+bin/
+obj/
+keys/
+Temp/
+TemplatesData/
+**/*.min.js
+wwwroot/lib/
+**/*.designer.cs
+**/*.g.cs
+.git/
+.vscode/
